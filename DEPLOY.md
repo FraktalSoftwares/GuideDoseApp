@@ -83,7 +83,29 @@ storeFile=<caminho-do-keystore>
    - Distribution Certificate
    - Provisioning Profile (App Store)
 
-## 📝 Notas de Versão (v1.0.1)
+## 📝 Notas de Versão
+
+### v1.0.2 (Atual)
+
+**Novo:**
+- 🌐 **Modo Offline Completo** - App funciona 100% sem internet
+- 💾 Cache local de medicamentos e induções
+- 🔄 Sincronização automática quando volta online
+- 📊 Indicador visual de status offline
+- ⚡ Favoritos funcionam offline
+
+**Melhorias:**
+- ✅ Dados carregam instantaneamente do cache local
+- ✅ Médicos podem usar em áreas sem sinal
+- ✅ Sincronização transparente em background
+
+**Técnico:**
+- Implementado SQLite para cache local
+- Sistema de fila para ações offline
+- Detecção automática de conectividade
+- Sincronização a cada 5 minutos quando online
+
+### v1.0.1
 
 **Melhorias:**
 - ✅ Corrigido problema de favoritos mostrando dados de outros usuários

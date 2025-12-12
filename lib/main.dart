@@ -9,6 +9,7 @@ import 'auth/supabase_auth/supabase_user_provider.dart';
 import 'auth/supabase_auth/auth_util.dart';
 
 import '/backend/supabase/supabase.dart';
+import '/backend/offline/sync_manager.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'flutter_flow/internationalization.dart';
@@ -22,6 +23,9 @@ void main() async {
   usePathUrlStrategy();
 
   await SupaFlow.initialize();
+
+  // Inicializa modo offline
+  await SyncManager.instance.initialize();
 
   await FlutterFlowTheme.initialize();
 
@@ -82,6 +86,10 @@ class _MyAppState extends State<MyApp> {
     userStream = guideDoseSupabaseUserStream()
       ..listen((user) {
         _appStateNotifier.update(user);
+        // Sincroniza dados quando usuário faz login
+        if (user.loggedIn) {
+          SyncManager.instance.syncData();
+        }
       });
     jwtTokenStream.listen((_) {});
     Future.delayed(

@@ -1,5 +1,8 @@
 import '/backend/supabase/supabase.dart';
+import '/backend/offline/sync_manager.dart';
+import '/backend/offline/offline_database.dart';
 import '/components/p_empty/p_empty_widget.dart';
+import '/components/offline_indicator/offline_indicator_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -91,6 +94,7 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
           child: Column(
             mainAxisSize: MainAxisSize.max,
             children: [
+              OfflineIndicatorWidget(),
               Padding(
                 padding: EdgeInsetsDirectional.fromSTEB(16.0, 12.0, 16.0, 0.0),
                 child: Container(

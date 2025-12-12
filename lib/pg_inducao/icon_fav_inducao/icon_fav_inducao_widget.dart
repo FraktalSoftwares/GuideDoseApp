@@ -1,5 +1,6 @@
 import '/auth/supabase_auth/auth_util.dart';
 import '/backend/supabase/supabase.dart';
+import '/backend/offline/sync_manager.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -100,12 +101,9 @@ class _IconFavInducaoWidgetState extends State<IconFavInducaoWidget> {
                   hoverColor: Colors.transparent,
                   highlightColor: Colors.transparent,
                   onTap: () async {
-                    await InducoesFavTable().insert({
-                      'created_at':
-                          supaSerialize<DateTime>(getCurrentTimestamp),
-                      'ind_usr_id': currentUserUid,
-                      'ind_id': widget!.inducaoID,
-                    });
+                    // Usa SyncManager para funcionar offline
+                    await SyncManager.instance
+                        .addFavorite('inducao', widget!.inducaoID!);
                     safeSetState(() => _model.requestCompleter = null);
                     await _model.waitForRequestCompleted();
                     if (widget.onFavChanged != null) {
@@ -125,12 +123,9 @@ class _IconFavInducaoWidgetState extends State<IconFavInducaoWidget> {
                   hoverColor: Colors.transparent,
                   highlightColor: Colors.transparent,
                   onTap: () async {
-                    await InducoesFavTable().delete(
-                      matchingRows: (rows) => rows.eqOrNull(
-                        'ind_id',
-                        widget!.inducaoID,
-                      ),
-                    );
+                    // Usa SyncManager para funcionar offline
+                    await SyncManager.instance
+                        .removeFavorite('inducao', widget!.inducaoID!);
                     safeSetState(() => _model.requestCompleter = null);
                     await _model.waitForRequestCompleted();
                     if (widget.onFavChanged != null) {

@@ -1,5 +1,6 @@
 import '/auth/supabase_auth/auth_util.dart';
 import '/backend/supabase/supabase.dart';
+import '/backend/offline/sync_manager.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -102,12 +103,9 @@ class _IconFavWidgetState extends State<IconFavWidget> {
                   hoverColor: Colors.transparent,
                   highlightColor: Colors.transparent,
                   onTap: () async {
-                    await MedicamentosFavTable().insert({
-                      'created_at':
-                          supaSerialize<DateTime>(getCurrentTimestamp),
-                      'user_id': currentUserUid,
-                      'med_id': widget!.medID,
-                    });
+                    // Usa SyncManager para funcionar offline
+                    await SyncManager.instance
+                        .addFavorite('medicamento', widget!.medID!);
                     safeSetState(() => _model.requestCompleter = null);
                     await _model.waitForRequestCompleted();
                     if (widget.onFavChanged != null) {
@@ -127,12 +125,9 @@ class _IconFavWidgetState extends State<IconFavWidget> {
                   hoverColor: Colors.transparent,
                   highlightColor: Colors.transparent,
                   onTap: () async {
-                    await MedicamentosFavTable().delete(
-                      matchingRows: (rows) => rows.eqOrNull(
-                        'id',
-                        containerMedicamentosFavRow?.id,
-                      ),
-                    );
+                    // Usa SyncManager para funcionar offline
+                    await SyncManager.instance
+                        .removeFavorite('medicamento', widget!.medID!);
                     safeSetState(() => _model.requestCompleter = null);
                     await _model.waitForRequestCompleted();
                     if (widget.onFavChanged != null) {
