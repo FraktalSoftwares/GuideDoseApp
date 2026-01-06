@@ -1,6 +1,7 @@
 import '/auth/supabase_auth/auth_util.dart';
 import '/backend/supabase/supabase.dart';
 import '/backend/offline/sync_manager.dart';
+import '/backend/offline/offline_database.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -51,96 +52,98 @@ class _IconFavWidgetState extends State<IconFavWidget> {
     super.dispose();
   }
 
+  Future<bool> _checkIfFavorite() async {
+    final syncManager = SyncManager.instance;
+
+    if (syncManager.isOnline) {
+      // Online: verifica no Supabase
+      try {
+        final result = await MedicamentosFavTable().querySingleRow(
+          queryFn: (q) => q
+              .eqOrNull('user_id', currentUserUid)
+              .eqOrNull('med_id', widget.medID),
+        );
+        return result.isNotEmpty;
+      } catch (e) {
+        // Se falhar online, verifica no cache
+        return await _checkFavoriteInCache();
+      }
+    } else {
+      // Offline: verifica no cache local
+      return await _checkFavoriteInCache();
+    }
+  }
+
+  Future<bool> _checkFavoriteInCache() async {
+    final db = await OfflineDatabase.instance.database;
+    final result = await db.query(
+      'medicamentos',
+      where: 'remote_id = ? AND is_favorite = 1',
+      whereArgs: [widget.medID],
+    );
+    return result.isNotEmpty;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<MedicamentosFavRow>>(
-      future: (_model.requestCompleter ??= Completer<List<MedicamentosFavRow>>()
-            ..complete(MedicamentosFavTable().querySingleRow(
-              queryFn: (q) => q
-                  .eqOrNull(
-                    'user_id',
-                    currentUserUid,
-                  )
-                  .eqOrNull(
-                    'med_id',
-                    widget!.medID,
-                  ),
-            )))
-          .future,
+    return FutureBuilder<bool>(
+      future: _checkIfFavorite(),
       builder: (context, snapshot) {
         // Customize what your widget looks like when it's loading.
         if (!snapshot.hasData) {
-          return Center(
-            child: SizedBox(
-              width: 50.0,
-              height: 50.0,
-              child: SpinKitRing(
-                color: Color(0xFF3C4F67),
-                size: 50.0,
+          return Container(
+            width: 24.0,
+            height: 24.0,
+            child: Center(
+              child: SizedBox(
+                width: 16.0,
+                height: 16.0,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.0,
+                  color: FlutterFlowTheme.of(context).primaryText,
+                ),
               ),
             ),
           );
         }
-        List<MedicamentosFavRow> containerMedicamentosFavRowList =
-            snapshot.data!;
 
-        final containerMedicamentosFavRow =
-            containerMedicamentosFavRowList.isNotEmpty
-                ? containerMedicamentosFavRowList.first
-                : null;
+        final isFavorite = snapshot.data!;
 
         return Container(
           width: 24.0,
           height: 24.0,
           decoration: BoxDecoration(),
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              if (containerMedicamentosFavRow?.id == null)
-                InkWell(
-                  splashColor: Colors.transparent,
-                  focusColor: Colors.transparent,
-                  hoverColor: Colors.transparent,
-                  highlightColor: Colors.transparent,
-                  onTap: () async {
-                    // Usa SyncManager para funcionar offline
-                    await SyncManager.instance
-                        .addFavorite('medicamento', widget!.medID!);
-                    safeSetState(() => _model.requestCompleter = null);
-                    await _model.waitForRequestCompleted();
-                    if (widget.onFavChanged != null) {
-                      widget.onFavChanged!();
-                    }
-                  },
-                  child: Icon(
-                    Icons.star_border,
-                    color: FlutterFlowTheme.of(context).primaryText,
-                    size: 24.0,
-                  ),
-                ),
-              if (containerMedicamentosFavRow?.id != null)
-                InkWell(
-                  splashColor: Colors.transparent,
-                  focusColor: Colors.transparent,
-                  hoverColor: Colors.transparent,
-                  highlightColor: Colors.transparent,
-                  onTap: () async {
-                    // Usa SyncManager para funcionar offline
-                    await SyncManager.instance
-                        .removeFavorite('medicamento', widget!.medID!);
-                    safeSetState(() => _model.requestCompleter = null);
-                    await _model.waitForRequestCompleted();
-                    if (widget.onFavChanged != null) {
-                      widget.onFavChanged!();
-                    }
-                  },
-                  child: Icon(
-                    Icons.star_rate,
-                    color: Color(0xFFFFED00),
-                    size: 24.0,
-                  ),
-                ),
-            ],
+          child: InkWell(
+            splashColor: Colors.transparent,
+            focusColor: Colors.transparent,
+            hoverColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            onTap: () async {
+              if (isFavorite) {
+                // Remove favorito
+                await SyncManager.instance
+                    .removeFavorite('medicamento', widget.medID!);
+              } else {
+                // Adiciona favorito
+                await SyncManager.instance
+                    .addFavorite('medicamento', widget.medID!);
+              }
+
+              // Atualiza UI
+              safeSetState(() {});
+
+              // Notifica parent
+              if (widget.onFavChanged != null) {
+                widget.onFavChanged!();
+              }
+            },
+            child: Icon(
+              isFavorite ? Icons.star_rate : Icons.star_border,
+              color: isFavorite
+                  ? Color(0xFFFFED00)
+                  : FlutterFlowTheme.of(context).primaryText,
+              size: 24.0,
+            ),
           ),
         );
       },

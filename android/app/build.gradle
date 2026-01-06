@@ -61,19 +61,51 @@ android {
         versionName flutterVersionName
     }
 
+    // Splits removido - usar --split-per-abi no comando flutter build apk quando necessário
+    // Para flutter run (desenvolvimento), não precisa de splits
+
    signingConfigs {
        release {
-           keyAlias keystoreProperties['keyAlias']
-           keyPassword keystoreProperties['keyPassword']
-           storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-           storePassword keystoreProperties['storePassword']
+           if (keystorePropertiesFile.exists()) {
+               def storeFilePath = keystoreProperties['storeFile']
+               if (storeFilePath) {
+                   def keystoreFileObj = file(storeFilePath)
+                   if (keystoreFileObj.exists()) {
+                       keyAlias keystoreProperties['keyAlias']
+                       keyPassword keystoreProperties['keyPassword']
+                       storeFile keystoreFileObj
+                       storePassword keystoreProperties['storePassword']
+                       println "✓ Keystore configurado: ${keystoreFileObj.absolutePath}"
+                   } else {
+                       println "✗ Keystore não encontrado: ${keystoreFileObj.absolutePath}"
+                   }
+               }
+           }
        }
    }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Só usa assinatura se o keystore existir e o arquivo estiver disponível
+            if (keystorePropertiesFile.exists()) {
+                def storeFilePath = keystoreProperties['storeFile']
+                if (storeFilePath) {
+                    def keystoreFile = file(storeFilePath)
+                    if (keystoreFile.exists()) {
+                        signingConfig signingConfigs.release
+                        println "✓ Assinatura aplicada ao build release"
+                    } else {
+                        println "✗ Keystore não encontrado, build sem assinatura: ${keystoreFile.absolutePath}"
+                    }
+                }
+            }
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            shrinkResources false
         }
     }
 }

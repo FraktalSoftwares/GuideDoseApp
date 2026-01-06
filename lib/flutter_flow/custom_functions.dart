@@ -1627,6 +1627,14 @@ String? calcularResultadoMestre(
   String? unidadePeso,
 ) {
 // 1. Validações
+  print('🔍 CALCULO: Recebeu ${listaItens.length} itens');
+  print(
+      '🔍 CALCULO: Primeiro item tipo: ${listaItens.isNotEmpty ? listaItens[0].runtimeType : "vazio"}');
+  print(
+      '🔍 CALCULO: Primeiro item: ${listaItens.isNotEmpty ? listaItens[0] : "vazio"}');
+  print('🔍 CALCULO: Dropdown selecionado: $nomeOpcaoSelecionada');
+  print('🔍 CALCULO: Slider value: $sliderValue');
+
   if (listaItens.isEmpty) return "Carregando...";
   if (pesoString.isEmpty) return "Digite o peso";
   if (sliderValue <= 0) return "Ajuste a dose";
@@ -1636,6 +1644,7 @@ String? calcularResultadoMestre(
 
   // 2. DEFINIR CONCENTRAÇÃO
   double concentracao = 0.0;
+  String? unidadeConcentracao; // Armazena a unidade da concentração (mg, mcg, mEq)
 
   // ESTRATÉGIA A: Tenta pegar número direto (Se o dropdown enviar "0.2")
   if (nomeOpcaoSelecionada != null) {
@@ -1646,44 +1655,81 @@ String? calcularResultadoMestre(
   // ESTRATÉGIA B: Leitura Inteligente do Texto (EXTRAÇÃO POR REGEX) 🚨 NOVO!
   // Se o texto for "100mEq... (0,2mEq/mL)", nós extraímos o "0,2".
   if (concentracao == 0 && nomeOpcaoSelecionada != null) {
-    // Procura um padrão de número logo antes de "mEq/mL" ou "mg/mL"
-    // Ex: (0,2mEq/mL) -> captura 0,2
+    // Procura um padrão de número logo antes de "mEq/mL" ou "mg/mL" ou "mcg/mL"
+    // Ex: (0,2mEq/mL) -> captura 0,2 e mEq
     RegExp regExp = RegExp(r'\((\d+[.,]?\d*)\s*(mEq|mg|mcg)/mL\)');
     Match? match = regExp.firstMatch(nomeOpcaoSelecionada);
 
     if (match != null) {
       String numeroString = match.group(1)!.replaceAll(',', '.');
+      unidadeConcentracao = match.group(2); // Captura a unidade (mg, mcg, mEq)
       double? extraido = double.tryParse(numeroString);
       if (extraido != null && extraido > 0) {
         concentracao = extraido;
+        print('🔍 CALCULO: Concentração extraída: $concentracao $unidadeConcentracao/mL');
       }
     }
   }
 
   // ESTRATÉGIA C: Varredura no Banco (Fallback)
   String unidadeEncontrada = "";
+  bool unidadeDefinida = false; // Flag para parar de sobrescrever
 
   for (var item in listaItens) {
     Map<String, dynamic>? dados;
     if (item is Map<String, dynamic>) {
-      if (item.containsKey('dados_calculo'))
+      print('🔍 CALCULO: Item é Map, keys: ${item.keys}');
+      if (item.containsKey('dados_calculo')) {
         dados = item['dados_calculo'];
-      else if (item.containsKey('unidade')) dados = item;
+        print('🔍 CALCULO: dados_calculo tipo: ${dados.runtimeType}');
+        print('🔍 CALCULO: dados_calculo conteúdo: $dados');
+      } else if (item.containsKey('unidade')) {
+        dados = item;
+        print('🔍 CALCULO: Usando item direto (tem unidade)');
+      }
+    } else {
+      print('⚠️ CALCULO: Item NÃO é Map, é ${item.runtimeType}');
     }
 
-    if (dados == null) continue;
+    if (dados == null) {
+      print('⚠️ CALCULO: dados é null, pulando item');
+      continue;
+    }
 
     // Tenta achar no mapa do JSON se a regex falhou
     if (concentracao == 0 &&
         nomeOpcaoSelecionada != null &&
         dados['opcoesConcentracoes'] != null) {
       var mapa = dados['opcoesConcentracoes'];
+      print('🔍 CALCULO: opcoesConcentracoes encontrado: $mapa');
+      print('🔍 CALCULO: Chaves disponíveis: ${mapa.keys.toList()}');
+      print('🔍 CALCULO: Procurando por: "$nomeOpcaoSelecionada"');
+
       if (mapa[nomeOpcaoSelecionada] != null) {
         var val = mapa[nomeOpcaoSelecionada];
+        print('✅ CALCULO: Encontrou valor para "$nomeOpcaoSelecionada": $val');
         if (val is num)
           concentracao = val.toDouble();
         else if (val is String) concentracao = double.tryParse(val) ?? 0.0;
+        print('✅ CALCULO: Concentração definida: $concentracao');
+      } else {
+        print('⚠️ CALCULO: "$nomeOpcaoSelecionada" não encontrado no mapa');
+        print('⚠️ CALCULO: Tentando buscar com trim...');
+        // Tenta com trim e comparação case-insensitive
+        for (var key in mapa.keys) {
+          if (key.toString().trim() == nomeOpcaoSelecionada.trim()) {
+            var val = mapa[key];
+            print('✅ CALCULO: Encontrou com trim! Valor: $val');
+            if (val is num)
+              concentracao = val.toDouble();
+            else if (val is String) concentracao = double.tryParse(val) ?? 0.0;
+            break;
+          }
+        }
       }
+    } else {
+      if (concentracao == 0)
+        print('⚠️ CALCULO: Não tem opcoesConcentracoes ou já tem concentração');
     }
 
     // Último recurso: Concentração padrão
@@ -1692,12 +1738,27 @@ String? calcularResultadoMestre(
       if (c is num) concentracao = c.toDouble();
     }
 
-    // Busca Unidade
-    if (dados['unidade'] != null) {
+    // Busca Unidade - APENAS do item que tem slideInput ou opcoesConcentracoes
+    if (!unidadeDefinida && dados['unidade'] != null) {
+      // Verifica se este item é o item principal (tem slideInput ou opcoesConcentracoes)
+      bool isItemPrincipal = dados.containsKey('slideInput') ||
+          dados.containsKey('opcoesConcentracoes');
+
       String u = dados['unidade'].toString();
-      if (u.contains("min") || u.contains("/h"))
+      print(
+          '🔍 CALCULO: Unidade encontrada: "$u", atual: "$unidadeEncontrada", isPrincipal: $isItemPrincipal');
+
+      if (isItemPrincipal) {
+        // Se é o item principal, usa a unidade dele e marca como definida
         unidadeEncontrada = u;
-      else if (unidadeEncontrada.isEmpty) unidadeEncontrada = u;
+        unidadeDefinida = true;
+        print('✅ CALCULO: Unidade PRINCIPAL definida: "$unidadeEncontrada"');
+      } else if (unidadeEncontrada.isEmpty &&
+          (u.contains("min") || u.contains("/h"))) {
+        // Fallback: se ainda não tem unidade e encontrou uma com min/h
+        unidadeEncontrada = u;
+        print('⚠️ CALCULO: Unidade fallback definida: "$unidadeEncontrada"');
+      }
     }
   }
 
@@ -1710,25 +1771,62 @@ String? calcularResultadoMestre(
     doseTotal = sliderValue * peso;
   }
 
-  double resultado = doseTotal / concentracao;
+  // 4. CONVERSÃO DE UNIDADES - CRÍTICO!
+  // Se a dose está em mcg mas a concentração está em mg, precisa converter
+  // 1 mg = 1000 mcg
+  double concentracaoConvertida = concentracao;
+  
+  // Detecta a unidade da dose (mcg, mg, mEq)
+  bool doseEmMcg = unidadeEncontrada.toLowerCase().contains('mcg');
+  bool doseEmMg = unidadeEncontrada.toLowerCase().contains('mg') && !doseEmMcg;
+  bool doseEmMeq = unidadeEncontrada.toLowerCase().contains('meq');
+  
+  // Detecta a unidade da concentração
+  bool concEmMcg = (unidadeConcentracao != null && unidadeConcentracao!.toLowerCase() == 'mcg');
+  bool concEmMg = (unidadeConcentracao != null && unidadeConcentracao!.toLowerCase() == 'mg');
+  bool concEmMeq = (unidadeConcentracao != null && unidadeConcentracao!.toLowerCase() == 'meq');
+  
+  // Se a dose está em mcg mas a concentração está em mg/mL, converte concentração para mcg/mL
+  if (doseEmMcg && concEmMg) {
+    concentracaoConvertida = concentracao * 1000; // mg/mL -> mcg/mL
+    print('🔍 CALCULO: Convertendo concentração: $concentracao mg/mL = $concentracaoConvertida mcg/mL');
+  }
+  // Se a dose está em mg mas a concentração está em mcg/mL, converte concentração para mg/mL
+  else if (doseEmMg && concEmMcg) {
+    concentracaoConvertida = concentracao / 1000; // mcg/mL -> mg/mL
+    print('🔍 CALCULO: Convertendo concentração: $concentracao mcg/mL = $concentracaoConvertida mg/mL');
+  }
+  // Se não detectou unidade da concentração, tenta inferir do texto do dropdown
+  else if (unidadeConcentracao == null && nomeOpcaoSelecionada != null) {
+    // Tenta detectar se o dropdown menciona mg ou mcg
+    String dropdownLower = nomeOpcaoSelecionada.toLowerCase();
+    if (doseEmMcg && (dropdownLower.contains('mg/ml') || dropdownLower.contains('mg/100ml'))) {
+      // Dose em mcg, mas dropdown mostra mg/mL -> converte
+      concentracaoConvertida = concentracao * 1000;
+      print('🔍 CALCULO: Inferindo conversão: dose em mcg, dropdown em mg -> $concentracao mg/mL = $concentracaoConvertida mcg/mL');
+    }
+  }
 
-  // 4. AJUSTES FINAIS
+  double resultado = doseTotal / concentracaoConvertida;
+
+  // 5. AJUSTES FINAIS
   if (unidadeEncontrada.contains("min")) {
     resultado = resultado * 60;
   }
 
   // Correção de Escala (para Bicarbonato/Sulfato com erro de cadastro antigo)
-  if (resultado < 1 && concentracao >= 1000) {
-    if (unidadeEncontrada.contains("mg") || unidadeEncontrada.contains("mEq")) {
-      resultado = resultado * 1000;
-    }
-  }
+  // REMOVIDO - não é mais necessário com a conversão correta de unidades
 
   String formatado = resultado.toStringAsFixed(1);
 
+  print(
+      '🎯 CALCULO FINAL: concentracao=$concentracao, doseTotal=$doseTotal, resultado=$resultado, unidade=$unidadeEncontrada');
+
   if (unidadeEncontrada.contains("min") || unidadeEncontrada.contains("/h")) {
+    print('✅ RETORNO: Vazão: $formatado mL/h');
     return "Vazão: $formatado mL/h";
   } else {
+    print('✅ RETORNO: Volume: $formatado mL');
     return "Volume: $formatado mL";
   }
 }

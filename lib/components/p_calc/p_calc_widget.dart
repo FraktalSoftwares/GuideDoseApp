@@ -1,4 +1,6 @@
 import '/auth/supabase_auth/auth_util.dart';
+import '/backend/offline/offline_database.dart';
+import '/backend/offline/sync_manager.dart';
 import '/backend/schema/structs/index.dart';
 import '/backend/supabase/supabase.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
@@ -53,7 +55,21 @@ class _PCalcWidgetState extends State<PCalcWidget> {
     _model.inputAlturaFocusNode2 ??= FocusNode();
 
     _model.inputAlturaMask2 = MaskTextInputFormatter(mask: '###');
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+    
+    // Inicializa o gênero selecionado com o valor salvo do usuário
+    // Garante que o radio button mostra a borda vermelha quando o popup abre
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (FFAppState().User.usrGenero != null && 
+          FFAppState().User.usrGenero!.isNotEmpty) {
+        FFAppState().generoSelecionado = FFAppState().User.usrGenero!;
+        FFAppState().update(() {});
+      } else if (FFAppState().generoSelecionado.isEmpty) {
+        // Se não tem valor salvo, define um padrão
+        FFAppState().generoSelecionado = 'Masculino';
+        FFAppState().update(() {});
+      }
+      safeSetState(() {});
+    });
   }
 
   @override
@@ -801,29 +817,23 @@ class _PCalcWidgetState extends State<PCalcWidget> {
                               0.0, 16.0, 0.0, 0.0),
                           child: FFButtonWidget(
                             onPressed: () async {
+                              final syncManager = SyncManager.instance;
+                              final offlineDb = OfflineDatabase.instance;
+
                               _model.retornoCategoria =
                                   await actions.checkAgeCategory(
                                 int.parse(
                                     _model.inputAlturaTextController2.text),
                                 FFAppState().User.usrLinguagem,
                               );
-                              await UsuariosTable().update(
-                                data: {
-                                  'id': currentUserUid,
-                                  'usr_kgs': _model.inputKGTextController.text,
-                                  'usr_altura':
-                                      _model.inputAlturaTextController1.text,
-                                  'usr_idade': int.tryParse(
-                                      _model.inputAlturaTextController2.text),
-                                  'usr_faixa_etaria': _model.retornoCategoria,
-                                  'usr_genero': FFAppState().generoSelecionado,
-                                  'anosMeses': _model.dropDownAnosValue,
-                                },
-                                matchingRows: (rows) => rows.eqOrNull(
-                                  'id',
-                                  currentUserUid,
-                                ),
-                              );
+
+                              // Atualiza FFAppState primeiro
+                              print('🔄 Atualizando FFAppState...');
+                              print(
+                                  '   Gênero selecionado: ${FFAppState().generoSelecionado}');
+                              print(
+                                  '   Anos/Meses: ${_model.dropDownAnosValue}');
+
                               FFAppState().updateUserStruct(
                                 (e) => e
                                   ..usrIdade =
@@ -835,6 +845,80 @@ class _PCalcWidgetState extends State<PCalcWidget> {
                                   ..usrFaixa = _model.retornoCategoria
                                   ..usrAnosmeses = _model.dropDownAnosValue,
                               );
+
+                              print('✅ FFAppState atualizado:');
+                              print(
+                                  '   User.usrGenero: ${FFAppState().User.usrGenero}');
+                              print(
+                                  '   User.usrAnosmeses: ${FFAppState().User.usrAnosmeses}');
+
+                              // Salva localmente sempre
+                              await offlineDb.saveUserData({
+                                'user_id': currentUserUid,
+                                'usr_kgs': _model.inputKGTextController.text,
+                                'usr_altura':
+                                    _model.inputAlturaTextController1.text,
+                                'usr_idade':
+                                    _model.inputAlturaTextController2.text,
+                                'usr_faixa': _model.retornoCategoria,
+                                'usr_genero': FFAppState().generoSelecionado,
+                                'usr_anos_meses': _model.dropDownAnosValue,
+                                'needs_sync': syncManager.isOnline ? 0 : 1,
+                                'last_sync': DateTime.now().toIso8601String(),
+                              });
+
+                              print(
+                                  '💾 Dados do usuário salvos localmente (needs_sync: ${syncManager.isOnline ? 0 : 1})');
+
+                              // Se estiver online, sincroniza com Supabase
+                              if (syncManager.isOnline) {
+                                try {
+                                  await UsuariosTable().update(
+                                    data: {
+                                      'id': currentUserUid,
+                                      'usr_kgs':
+                                          _model.inputKGTextController.text,
+                                      'usr_altura': _model
+                                          .inputAlturaTextController1.text,
+                                      'usr_idade': int.tryParse(_model
+                                          .inputAlturaTextController2.text),
+                                      'usr_faixa_etaria':
+                                          _model.retornoCategoria,
+                                      'usr_genero':
+                                          FFAppState().generoSelecionado,
+                                      'anosMeses': _model.dropDownAnosValue,
+                                    },
+                                    matchingRows: (rows) => rows.eqOrNull(
+                                      'id',
+                                      currentUserUid,
+                                    ),
+                                  );
+                                  print('✅ Dados sincronizados com Supabase');
+                                } catch (e) {
+                                  print('❌ Erro ao sincronizar: $e');
+                                  // Marca para sincronizar depois
+                                  await offlineDb.saveUserData({
+                                    'user_id': currentUserUid,
+                                    'usr_kgs':
+                                        _model.inputKGTextController.text,
+                                    'usr_altura':
+                                        _model.inputAlturaTextController1.text,
+                                    'usr_idade':
+                                        _model.inputAlturaTextController2.text,
+                                    'usr_faixa': _model.retornoCategoria,
+                                    'usr_genero':
+                                        FFAppState().generoSelecionado,
+                                    'usr_anos_meses': _model.dropDownAnosValue,
+                                    'needs_sync': 1,
+                                    'last_sync':
+                                        DateTime.now().toIso8601String(),
+                                  });
+                                }
+                              } else {
+                                print(
+                                    '📴 Offline: dados serão sincronizados quando voltar online');
+                              }
+
                               safeSetState(() {});
                               safeSetState(() {
                                 _model.inputKGTextController?.text =

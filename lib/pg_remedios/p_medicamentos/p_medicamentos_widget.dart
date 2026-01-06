@@ -1,6 +1,7 @@
 import '/backend/supabase/supabase.dart';
 import '/backend/offline/sync_manager.dart';
 import '/backend/offline/offline_database.dart';
+import '/backend/offline/offline_helper.dart';
 import '/components/p_empty/p_empty_widget.dart';
 import '/components/offline_indicator/offline_indicator_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -53,21 +54,54 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
     super.dispose();
   }
 
+  Future<List<Map<String, dynamic>>> _loadMedicamentos() async {
+    final syncManager = SyncManager.instance;
+    final searchText = _model.textController.text.toLowerCase();
+
+    if (syncManager.isOnline) {
+      // Online: busca do Supabase
+      try {
+        final rows = await VwMedicamentosOrdernadosTable().queryRows(
+          queryFn: (q) => q
+              .ilike('nome_chave', '%$searchText%')
+              .order('favorito_flag')
+              .order('nome_chave', ascending: true),
+        );
+        // Converte Row para Map
+        return rows
+            .map((r) => {
+                  'remote_id': r.id,
+                  'nome': r.ptNomePrincipioAtivo,
+                  'nome_en': r.usNomePrincipioAtivo,
+                  'nome_es': r.esNomePrincipioAtivo,
+                  'is_favorite': (r.favoritoFlag == true) ? 1 : 0,
+                })
+            .toList();
+      } catch (e) {
+        print('Erro ao buscar medicamentos online: $e');
+        // Se falhar online, tenta offline
+        return await OfflineDatabase.instance.getAllMedicamentos();
+      }
+    } else {
+      // Offline: busca do cache local
+      final allMeds = await OfflineDatabase.instance.getAllMedicamentos();
+
+      // Filtra por busca se houver texto
+      if (searchText.isEmpty) {
+        return allMeds;
+      }
+
+      return allMeds.where((med) {
+        final nome = (med['nome'] ?? '').toString().toLowerCase();
+        return nome.contains(searchText);
+      }).toList();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<VwMedicamentosOrdernadosRow>>(
-      future: (_model.requestCompleter ??=
-              Completer<List<VwMedicamentosOrdernadosRow>>()
-                ..complete(VwMedicamentosOrdernadosTable().queryRows(
-                  queryFn: (q) => q
-                      .ilike(
-                        'nome_chave',
-                        '%${_model.textController.text}%',
-                      )
-                      .order('favorito_flag')
-                      .order('nome_chave', ascending: true),
-                )))
-          .future,
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _loadMedicamentos(),
       builder: (context, snapshot) {
         // Customize what your widget looks like when it's loading.
         if (!snapshot.hasData) {
@@ -82,8 +116,7 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
             ),
           );
         }
-        List<VwMedicamentosOrdernadosRow>
-            containerVwMedicamentosOrdernadosRowList = snapshot.data!;
+        List<Map<String, dynamic>> medicamentosList = snapshot.data!;
 
         return Container(
           width: double.infinity,
@@ -106,8 +139,7 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
                       '_model.textController',
                       Duration(milliseconds: 2000),
                       () async {
-                        safeSetState(() => _model.requestCompleter = null);
-                        await _model.waitForRequestCompleted();
+                        safeSetState(() {});
                       },
                     ),
                     autofocus: false,
@@ -220,9 +252,7 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
                   padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
                   child: Builder(
                     builder: (context) {
-                      final remedios = containerVwMedicamentosOrdernadosRowList
-                          .map((e) => e)
-                          .toList();
+                      final remedios = medicamentosList;
                       if (remedios.isEmpty) {
                         return Container(
                           width: 250.0,
@@ -235,8 +265,9 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
                         color: Color(0xFF3C4F67),
                         backgroundColor: Color(0xFF14181B),
                         onRefresh: () async {
-                          safeSetState(() => _model.requestCompleter = null);
-                          await _model.waitForRequestCompleted();
+                          // Força sincronização quando puxa para atualizar
+                          await SyncManager.instance.syncData();
+                          safeSetState(() {});
                         },
                         child: ListView.builder(
                           padding: EdgeInsets.zero,
@@ -271,12 +302,11 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
                                               valueOrDefault<String>(
                                                 FFLocalizations.of(context)
                                                     .getVariableText(
-                                                  ptText: remediosItem
-                                                      .ptNomePrincipioAtivo,
-                                                  enText: remediosItem
-                                                      .usNomePrincipioAtivo,
-                                                  esText: remediosItem
-                                                      .esNomePrincipioAtivo,
+                                                  ptText: remediosItem['nome'],
+                                                  enText:
+                                                      remediosItem['nome_en'],
+                                                  esText:
+                                                      remediosItem['nome_es'],
                                                 ),
                                                 'Indefinido',
                                               ),
@@ -307,7 +337,8 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
                                           wrapWithModel(
                                             model:
                                                 _model.iconFavModels.getModel(
-                                              remediosItem.id!.toString(),
+                                              remediosItem['remote_id']
+                                                  .toString(),
                                               remediosIndex,
                                             ),
                                             updateCallback: () =>
@@ -315,14 +346,11 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
                                             updateOnChange: true,
                                             child: IconFavWidget(
                                               key: Key(
-                                                'Keysz4_${remediosItem.id!.toString()}',
+                                                'Keysz4_${remediosItem['remote_id'].toString()}',
                                               ),
-                                              medID: remediosItem.id!,
+                                              medID: remediosItem['remote_id'],
                                               onFavChanged: () async {
-                                                safeSetState(() => _model
-                                                    .requestCompleter = null);
-                                                await _model
-                                                    .waitForRequestCompleted();
+                                                safeSetState(() {});
                                               },
                                             ),
                                           ),
@@ -345,7 +373,8 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
                                                             context),
                                                     child:
                                                         PDetalheMedicamentoWidget(
-                                                      id: remediosItem.id!,
+                                                      id: remediosItem[
+                                                          'remote_id'],
                                                     ),
                                                   );
                                                 },
@@ -363,7 +392,7 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
                                             ),
                                           ),
                                           if (_model.accordeonVisivel !=
-                                              remediosItem.id)
+                                              remediosItem['remote_id'])
                                             InkWell(
                                               splashColor: Colors.transparent,
                                               focusColor: Colors.transparent,
@@ -372,7 +401,7 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
                                                   Colors.transparent,
                                               onTap: () async {
                                                 _model.accordeonVisivel =
-                                                    remediosItem.id;
+                                                    remediosItem['remote_id'];
                                                 safeSetState(() {});
                                               },
                                               child: Icon(
@@ -382,7 +411,7 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
                                               ),
                                             ),
                                           if (_model.accordeonVisivel ==
-                                              remediosItem.id)
+                                              remediosItem['remote_id'])
                                             InkWell(
                                               splashColor: Colors.transparent,
                                               focusColor: Colors.transparent,
@@ -402,21 +431,22 @@ class _PMedicamentosWidgetState extends State<PMedicamentosWidget> {
                                         ].divide(SizedBox(width: 8.0)),
                                       ),
                                       if (_model.accordeonVisivel ==
-                                          remediosItem.id)
+                                          remediosItem['remote_id'])
                                         wrapWithModel(
                                           model: _model
                                               .pAccordeonMedicamentoModels
                                               .getModel(
-                                            remediosItem.id!.toString(),
+                                            remediosItem['remote_id']
+                                                .toString(),
                                             remediosIndex,
                                           ),
                                           updateCallback: () =>
                                               safeSetState(() {}),
                                           child: PAccordeonMedicamentoWidget(
                                             key: Key(
-                                              'Key6i0_${remediosItem.id!.toString()}',
+                                              'Key6i0_${remediosItem['remote_id'].toString()}',
                                             ),
-                                            id: remediosItem.id!,
+                                            id: remediosItem['remote_id'],
                                           ),
                                         ),
                                     ].divide(SizedBox(height: 8.0)),

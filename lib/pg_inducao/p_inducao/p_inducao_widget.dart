@@ -53,21 +53,46 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
     super.dispose();
   }
 
+  Future<List<Map<String, dynamic>>> _loadInducoes() async {
+    final syncManager = SyncManager.instance;
+    final searchText = _model.textController.text.toLowerCase();
+
+    if (syncManager.isOnline) {
+      try {
+        final rows = await VwInducoesOrdenadasTable().queryRows(
+          queryFn: (q) => q
+              .ilike('ind_nome', '%$searchText%')
+              .order('favorito_flag')
+              .order('ind_nome', ascending: true),
+        );
+        return rows
+            .map((r) => {
+                  'remote_id': r.id,
+                  'nome': r.indNome,
+                  'nome_en': r.indNomeEn,
+                  'nome_es': r.indNomeEs,
+                  'is_favorite': (r.favoritoFlag == true) ? 1 : 0,
+                })
+            .toList();
+      } catch (e) {
+        print('Erro ao buscar induções online: $e');
+        return await OfflineDatabase.instance.getAllInducoes();
+      }
+    } else {
+      final allInds = await OfflineDatabase.instance.getAllInducoes();
+      if (searchText.isEmpty) return allInds;
+
+      return allInds.where((ind) {
+        final nome = (ind['nome'] ?? '').toString().toLowerCase();
+        return nome.contains(searchText);
+      }).toList();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<VwInducoesOrdenadasRow>>(
-      future:
-          (_model.requestCompleter ??= Completer<List<VwInducoesOrdenadasRow>>()
-                ..complete(VwInducoesOrdenadasTable().queryRows(
-                  queryFn: (q) => q
-                      .ilike(
-                        'ind_nome',
-                        '%${_model.textController.text}%',
-                      )
-                      .order('favorito_flag')
-                      .order('ind_nome', ascending: true),
-                )))
-              .future,
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _loadInducoes(),
       builder: (context, snapshot) {
         // Customize what your widget looks like when it's loading.
         if (!snapshot.hasData) {
@@ -82,8 +107,7 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
             ),
           );
         }
-        List<VwInducoesOrdenadasRow> containerVwInducoesOrdenadasRowList =
-            snapshot.data!;
+        List<Map<String, dynamic>> inducoesList = snapshot.data!;
 
         return Container(
           width: double.infinity,
@@ -106,8 +130,7 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
                       '_model.textController',
                       Duration(milliseconds: 2000),
                       () async {
-                        safeSetState(() => _model.requestCompleter = null);
-                        await _model.waitForRequestCompleted();
+                        safeSetState(() {});
                       },
                     ),
                     autofocus: false,
@@ -220,9 +243,7 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
                   padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
                   child: Builder(
                     builder: (context) {
-                      final inducao = containerVwInducoesOrdenadasRowList
-                          .map((e) => e)
-                          .toList();
+                      final inducao = inducoesList;
                       if (inducao.isEmpty) {
                         return Container(
                           width: 250.0,
@@ -235,8 +256,8 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
                         color: Color(0xFF3C4F67),
                         backgroundColor: Color(0xFF14181B),
                         onRefresh: () async {
-                          safeSetState(() => _model.requestCompleter = null);
-                          await _model.waitForRequestCompleted();
+                          await SyncManager.instance.syncData();
+                          safeSetState(() {});
                         },
                         child: ListView.builder(
                           padding: EdgeInsets.zero,
@@ -272,9 +293,11 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
                                               valueOrDefault<String>(
                                                 FFLocalizations.of(context)
                                                     .getVariableText(
-                                                  ptText: inducaoItem.indNome,
-                                                  enText: inducaoItem.indNomeEn,
-                                                  esText: inducaoItem.indNomeEs,
+                                                  ptText: inducaoItem['nome'],
+                                                  enText:
+                                                      inducaoItem['nome_en'],
+                                                  esText:
+                                                      inducaoItem['nome_es'],
                                                 ),
                                                 'Indefinido',
                                               ),
@@ -305,21 +328,20 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
                                           wrapWithModel(
                                             model: _model.iconFavInducaoModels
                                                 .getModel(
-                                              inducaoItem.id!.toString(),
+                                              inducaoItem['remote_id']
+                                                  .toString(),
                                               inducaoIndex,
                                             ),
                                             updateCallback: () =>
                                                 safeSetState(() {}),
                                             child: IconFavInducaoWidget(
                                               key: Key(
-                                                'Keyoy3_${inducaoItem.id!.toString()}',
+                                                'Keyoy3_${inducaoItem['remote_id'].toString()}',
                                               ),
-                                              inducaoID: inducaoItem.id!,
+                                              inducaoID:
+                                                  inducaoItem['remote_id'],
                                               onFavChanged: () async {
-                                                safeSetState(() => _model
-                                                    .requestCompleter = null);
-                                                await _model
-                                                    .waitForRequestCompleted();
+                                                safeSetState(() {});
                                               },
                                             ),
                                           ),
@@ -342,7 +364,8 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
                                                             context),
                                                     child:
                                                         PDetalheInducaoWidget(
-                                                      id: inducaoItem.id!,
+                                                      id: inducaoItem[
+                                                          'remote_id'],
                                                     ),
                                                   );
                                                 },
@@ -360,7 +383,7 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
                                             ),
                                           ),
                                           if (_model.accordeonVisivel !=
-                                              inducaoItem.id)
+                                              inducaoItem['remote_id'])
                                             InkWell(
                                               splashColor: Colors.transparent,
                                               focusColor: Colors.transparent,
@@ -369,7 +392,7 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
                                                   Colors.transparent,
                                               onTap: () async {
                                                 _model.accordeonVisivel =
-                                                    inducaoItem.id;
+                                                    inducaoItem['remote_id'];
                                                 safeSetState(() {});
                                               },
                                               child: Icon(
@@ -379,7 +402,7 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
                                               ),
                                             ),
                                           if (_model.accordeonVisivel ==
-                                              inducaoItem.id)
+                                              inducaoItem['remote_id'])
                                             InkWell(
                                               splashColor: Colors.transparent,
                                               focusColor: Colors.transparent,
@@ -399,20 +422,20 @@ class _PInducaoWidgetState extends State<PInducaoWidget> {
                                         ].divide(SizedBox(width: 8.0)),
                                       ),
                                       if (_model.accordeonVisivel ==
-                                          inducaoItem.id)
+                                          inducaoItem['remote_id'])
                                         wrapWithModel(
                                           model: _model.pAccordeonInducaoModels
                                               .getModel(
-                                            inducaoItem.id!.toString(),
+                                            inducaoItem['remote_id'].toString(),
                                             inducaoIndex,
                                           ),
                                           updateCallback: () =>
                                               safeSetState(() {}),
                                           child: PAccordeonInducaoWidget(
                                             key: Key(
-                                              'Keyg09_${inducaoItem.id!.toString()}',
+                                              'Keyg09_${inducaoItem['remote_id'].toString()}',
                                             ),
-                                            idInducao: inducaoItem.id,
+                                            idInducao: inducaoItem['remote_id'],
                                           ),
                                         ),
                                     ].divide(SizedBox(height: 8.0)),

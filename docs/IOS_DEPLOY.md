@@ -2,59 +2,28 @@
 
 ## 🍎 Opções para Build iOS no Windows
 
-### Opção 1: Codemagic (RECOMENDADO)
+### Opção 1: Codemagic (RECOMENDADO) ⭐
 
 **Vantagens:**
 - ✅ Não precisa de Mac
 - ✅ Interface visual simples
 - ✅ 500 minutos grátis/mês
 - ✅ Envia automaticamente para TestFlight
+- ✅ Configuração completa já preparada
 
-**Passo a passo:**
+**📖 Guia Completo:**
+👉 **Veja o guia detalhado:** [`docs/CODEMAGIC_SETUP.md`](../docs/CODEMAGIC_SETUP.md)
 
-1. **Acesse:** https://codemagic.io/signup
-   - Faça login com sua conta GitHub
+**Resumo rápido:**
 
-2. **Conecte o repositório:**
-   - Clique em "Add application"
-   - Selecione o repositório: `FraktalSoftwares/GuideDoseApp`
-   - Escolha "Flutter App"
-
-3. **Configure os certificados Apple:**
-   
-   a) **App Store Connect API Key:**
-   - Acesse: https://appstoreconnect.apple.com/access/api
-   - Clique em "Keys" > "Generate API Key"
-   - Dê um nome (ex: "Codemagic")
-   - Selecione "Developer" como role
-   - Baixe o arquivo `.p8`
-   - Anote: `Key ID` e `Issuer ID`
-   
-   b) **Certificado de Distribuição:**
-   - Acesse: https://developer.apple.com/account/resources/certificates
-   - Crie um "iOS Distribution" certificate
-   - Baixe o arquivo `.cer`
-   - Converta para `.p12` (veja instruções abaixo)
-   
-   c) **Provisioning Profile:**
-   - Acesse: https://developer.apple.com/account/resources/profiles
-   - Crie um "App Store" profile
-   - Selecione o App ID: `com.mycompany.mcguidedose.apps`
-   - Selecione o certificado criado acima
-   - Baixe o arquivo `.mobileprovision`
-
-4. **Configure no Codemagic:**
-   - Vá em "Team settings" > "Code signing identities"
-   - Faça upload do certificado `.p12` e provisioning profile
-   - Em "Environment variables", adicione:
-     - `APP_STORE_CONNECT_ISSUER_ID`
-     - `APP_STORE_CONNECT_KEY_IDENTIFIER`
-     - `APP_STORE_CONNECT_PRIVATE_KEY` (conteúdo do arquivo .p8 em base64)
-
-5. **Inicie o build:**
-   - Clique em "Start new build"
-   - Selecione o workflow "ios-workflow"
-   - O Codemagic vai fazer o build e enviar para TestFlight automaticamente!
+1. **Criar App Store Connect API Key** (arquivo `.p8`)
+2. **Criar Certificado de Distribuição** (arquivo `.p12`)
+3. **Criar Provisioning Profile** (arquivo `.mobileprovision`)
+4. **Configurar no Codemagic:**
+   - Conectar repositório GitHub
+   - Fazer upload dos certificados
+   - Adicionar variáveis de ambiente
+5. **Iniciar build** - O Codemagic faz tudo automaticamente!
 
 ---
 

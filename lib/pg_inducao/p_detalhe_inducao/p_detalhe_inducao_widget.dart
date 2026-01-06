@@ -1,4 +1,6 @@
 import '/backend/supabase/supabase.dart';
+import '/backend/offline/sync_manager.dart';
+import '/backend/offline/offline_database.dart';
 import '/components/p_empty_list/p_empty_list_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -48,17 +50,160 @@ class _PDetalheInducaoWidgetState extends State<PDetalheInducaoWidget> {
     super.dispose();
   }
 
+  // Método helper para carregar subtópicos por tópico (online ou offline)
+  Future<List<VwInducoesSubtopicosRow>> _loadSubtopicosByTopico(
+      String topico) async {
+    final syncManager = SyncManager.instance;
+
+    if (syncManager.isOnline) {
+      try {
+        return await VwInducoesSubtopicosTable().queryRows(
+          queryFn: (q) =>
+              q.eqOrNull('ind_id', widget.id).eqOrNull('ind_topico', topico),
+        );
+      } catch (e) {
+        print('❌ Erro ao buscar subtópicos online ($topico): $e');
+        return [];
+      }
+    }
+
+    // Offline: busca do cache e filtra por tópico
+    try {
+      print('💾 Buscando subtópicos do cache (tópico: $topico)');
+      final cached =
+          await OfflineDatabase.instance.getSubtopicosByInducaoId(widget.id!);
+
+      // Filtra por tópico
+      final filtered =
+          cached.where((map) => map['ind_topico'] == topico).toList();
+      print('📦 Encontrados ${filtered.length} subtópicos para tópico $topico');
+
+      // Converte Map para VwInducoesSubtopicosRow
+      return filtered.map((map) {
+        final mappedData = {
+          'ind_id': map['ind_id'],
+          'ind_topico': map['ind_topico'],
+          'ind_titulos': map['ind_titulos'],
+          'conteudos_pt': map['ind_descricao'],
+          'conteudos_en': map['ind_descricao_en'],
+          'conteudos_es': map['ind_descricao_es'],
+        };
+        return VwInducoesSubtopicosRow(mappedData);
+      }).toList();
+    } catch (e) {
+      print('❌ Erro ao buscar subtópicos do cache ($topico): $e');
+      return [];
+    }
+  }
+
+  Future<List<InducoesSubtopicosRow>> _loadSubtopicos() async {
+    final syncManager = SyncManager.instance;
+
+    if (syncManager.isOnline) {
+      try {
+        return await InducoesSubtopicosTable().queryRows(
+          queryFn: (q) => q.eqOrNull('ind_id', widget.id),
+        );
+      } catch (e) {
+        print('❌ Erro ao buscar subtópicos online: $e');
+        return [];
+      }
+    }
+
+    // Offline: busca do cache
+    try {
+      print(
+          '💾 Buscando TODOS subtópicos do cache para indução ID: ${widget.id}');
+      final cached =
+          await OfflineDatabase.instance.getSubtopicosByInducaoId(widget.id!);
+      print('📦 Encontrados ${cached.length} subtópicos no cache');
+
+      // Converte Map para InducoesSubtopicosRow
+      // IMPORTANTE: InducoesSubtopicosRow usa ind_nome/ind_nome_en/ind_nome_es para o CONTEÚDO
+      return cached.map((map) {
+        final mappedData = {
+          'ind_id': map['ind_id'],
+          'ind_topico': map['ind_topico'],
+          'ind_titulos': map['ind_titulos'],
+          'ind_nome': map['ind_descricao'], // Conteúdo em PT
+          'ind_nome_en': map['ind_descricao_en'], // Conteúdo em EN
+          'ind_nome_es': map['ind_descricao_es'], // Conteúdo em ES
+        };
+        return InducoesSubtopicosRow(mappedData);
+      }).toList();
+    } catch (e) {
+      print('❌ Erro ao buscar subtópicos do cache: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> _loadInducaoDetails() async {
+    final syncManager = SyncManager.instance;
+
+    print('🔍 Carregando detalhes da indução ID: ${widget.id}');
+    print('📡 Status online: ${syncManager.isOnline}');
+
+    if (syncManager.isOnline) {
+      // Online: busca do Supabase
+      try {
+        print('🌐 Buscando do Supabase...');
+        final rows = await InducoesTable().querySingleRow(
+          queryFn: (q) => q.eqOrNull('id', widget.id),
+        );
+        print('📦 Rows recebidos: ${rows?.length ?? 0}');
+        if (rows != null && rows.isNotEmpty) {
+          final row = rows.first;
+          print('✅ Indução encontrada online: ${row.indNome}');
+          return {
+            'ind_nome': row.indNome,
+            'ind_nome_en': row.indNomeEn,
+            'ind_nome_es': row.indNomeEs,
+            'ind_definicao': row.indDefinicao,
+            'definicao_en': row.definicaoEn,
+            'definicao_es': row.definicaoEs,
+            'ind_epidemiologia': row.indEpidemiologia,
+            'epidemiologia_en': row.epidemiologiaEn,
+            'epidemiologia_es': row.epidemiologiaEs,
+            'ind_fisiopatologia': row.indFisiopatologia,
+            'fisiopatologia_en': row.fisiopatologiaEn,
+            'fisiopatologia_es': row.fisiopatologiaEs,
+          };
+        }
+        print('⚠️ Nenhuma indução encontrada online');
+      } catch (e) {
+        print('❌ Erro ao buscar indução online: $e');
+      }
+    }
+
+    // Offline ou falhou online: busca do cache
+    print('💾 Buscando do cache local...');
+    final cached = await OfflineDatabase.instance.getInducaoById(widget.id!);
+    if (cached != null) {
+      print('✅ Indução encontrada no cache: ${cached['nome']}');
+      print('📋 Campos disponíveis: ${cached.keys.toList()}');
+      print('🔍 DEBUG - Valores completos:');
+      cached.forEach((key, value) {
+        if (key.contains('nome') ||
+            key.contains('definicao') ||
+            key.contains('epidemiologia') ||
+            key.contains('fisiopatologia')) {
+          final valueStr = value?.toString() ?? 'NULL';
+          final preview = valueStr.length > 50
+              ? '${valueStr.substring(0, 50)}...'
+              : valueStr;
+          print('   $key = $preview');
+        }
+      });
+    } else {
+      print('❌ Indução NÃO encontrada no cache');
+    }
+    return cached;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<InducoesRow>>(
-      future: (_model.requestCompleter1 ??= Completer<List<InducoesRow>>()
-            ..complete(InducoesTable().querySingleRow(
-              queryFn: (q) => q.eqOrNull(
-                'id',
-                widget!.id,
-              ),
-            )))
-          .future,
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _loadInducaoDetails(),
       builder: (context, snapshot) {
         // Customize what your widget looks like when it's loading.
         if (!snapshot.hasData) {
@@ -73,11 +218,8 @@ class _PDetalheInducaoWidgetState extends State<PDetalheInducaoWidget> {
             ),
           );
         }
-        List<InducoesRow> containerInducoesRowList = snapshot.data!;
 
-        final containerInducoesRow = containerInducoesRowList.isNotEmpty
-            ? containerInducoesRowList.first
-            : null;
+        final inducao = snapshot.data;
 
         return Container(
           width: double.infinity,
@@ -149,12 +291,7 @@ class _PDetalheInducaoWidgetState extends State<PDetalheInducaoWidget> {
                   child: FutureBuilder<List<InducoesSubtopicosRow>>(
                     future: (_model.requestCompleter2 ??=
                             Completer<List<InducoesSubtopicosRow>>()
-                              ..complete(InducoesSubtopicosTable().queryRows(
-                                queryFn: (q) => q.eqOrNull(
-                                  'ind_id',
-                                  widget!.id,
-                                ),
-                              )))
+                              ..complete(_loadSubtopicos()))
                         .future,
                     builder: (context, snapshot) {
                       // Customize what your widget looks like when it's loading.
@@ -198,23 +335,13 @@ class _PDetalheInducaoWidgetState extends State<PDetalheInducaoWidget> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    valueOrDefault<String>(
-                                      FFLocalizations.of(context)
-                                          .getVariableText(
-                                        ptText: valueOrDefault<String>(
-                                          containerInducoesRow?.indNome,
+                                    FFLocalizations.of(context).getVariableText(
+                                      ptText:
+                                          inducao?['ind_nome'] ?? 'Indefinido',
+                                      enText: inducao?['ind_nome_en'] ??
                                           'Indefinido',
-                                        ),
-                                        enText: valueOrDefault<String>(
-                                          containerInducoesRow?.indNomeEn,
+                                      esText: inducao?['ind_nome_es'] ??
                                           'Indefinido',
-                                        ),
-                                        esText: valueOrDefault<String>(
-                                          containerInducoesRow?.indNomeEs,
-                                          'Indefinido',
-                                        ),
-                                      ),
-                                      'Indefinido',
                                     ),
                                     style: FlutterFlowTheme.of(context)
                                         .textAuth
@@ -234,35 +361,6 @@ class _PDetalheInducaoWidgetState extends State<PDetalheInducaoWidget> {
                                           fontStyle:
                                               FlutterFlowTheme.of(context)
                                                   .textAuth
-                                                  .fontStyle,
-                                        ),
-                                  ),
-                                  Text(
-                                    valueOrDefault<String>(
-                                      widget!.id?.toString(),
-                                      '0',
-                                    ),
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .override(
-                                          font: GoogleFonts.inter(
-                                            fontWeight:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodyMedium
-                                                    .fontWeight,
-                                            fontStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodyMedium
-                                                    .fontStyle,
-                                          ),
-                                          letterSpacing: 0.0,
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
                                                   .fontStyle,
                                         ),
                                   ),
@@ -292,17 +390,13 @@ class _PDetalheInducaoWidgetState extends State<PDetalheInducaoWidget> {
                                         ),
                                   ),
                                   Text(
-                                    valueOrDefault<String>(
-                                      FFLocalizations.of(context)
-                                          .getVariableText(
-                                        ptText:
-                                            containerInducoesRow?.indDefinicao,
-                                        enText:
-                                            containerInducoesRow?.definicaoEn,
-                                        esText:
-                                            containerInducoesRow?.definicaoEs,
-                                      ),
-                                      'Definicao',
+                                    FFLocalizations.of(context).getVariableText(
+                                      ptText: inducao?['ind_definicao'] ??
+                                          'Indefinido',
+                                      enText: inducao?['definicao_en'] ??
+                                          'Indefinido',
+                                      esText: inducao?['definicao_es'] ??
+                                          'Indefinido',
                                     ),
                                     style: FlutterFlowTheme.of(context)
                                         .infoMedicamentos
@@ -356,17 +450,13 @@ class _PDetalheInducaoWidgetState extends State<PDetalheInducaoWidget> {
                                         ),
                                   ),
                                   Text(
-                                    valueOrDefault<String>(
-                                      FFLocalizations.of(context)
-                                          .getVariableText(
-                                        ptText: containerInducoesRow
-                                            ?.indEpidemiologia,
-                                        enText: containerInducoesRow
-                                            ?.epidemiologiaEn,
-                                        esText: containerInducoesRow
-                                            ?.epidemiologiaEs,
-                                      ),
-                                      'Indefinido',
+                                    FFLocalizations.of(context).getVariableText(
+                                      ptText: inducao?['ind_epidemiologia'] ??
+                                          'Indefinido',
+                                      enText: inducao?['epidemiologia_en'] ??
+                                          'Indefinido',
+                                      esText: inducao?['epidemiologia_es'] ??
+                                          'Indefinido',
                                     ),
                                     style: FlutterFlowTheme.of(context)
                                         .infoMedicamentos
@@ -420,17 +510,13 @@ class _PDetalheInducaoWidgetState extends State<PDetalheInducaoWidget> {
                                         ),
                                   ),
                                   Text(
-                                    valueOrDefault<String>(
-                                      FFLocalizations.of(context)
-                                          .getVariableText(
-                                        ptText: containerInducoesRow
-                                            ?.indFisiopatologia,
-                                        enText: containerInducoesRow
-                                            ?.fisiopatologiaEn,
-                                        esText: containerInducoesRow
-                                            ?.fisiopatologiaEs,
-                                      ),
-                                      'Indefinido',
+                                    FFLocalizations.of(context).getVariableText(
+                                      ptText: inducao?['ind_fisiopatologia'] ??
+                                          'Indefinido',
+                                      enText: inducao?['fisiopatologia_en'] ??
+                                          'Indefinido',
+                                      esText: inducao?['fisiopatologia_es'] ??
+                                          'Indefinido',
                                     ),
                                     style: FlutterFlowTheme.of(context)
                                         .infoMedicamentos
@@ -503,18 +589,8 @@ class _PDetalheInducaoWidgetState extends State<PDetalheInducaoWidget> {
                                           ),
                                           FutureBuilder<
                                               List<VwInducoesSubtopicosRow>>(
-                                            future: VwInducoesSubtopicosTable()
-                                                .queryRows(
-                                              queryFn: (q) => q
-                                                  .eqOrNull(
-                                                    'ind_id',
-                                                    widget!.id,
-                                                  )
-                                                  .eqOrNull(
-                                                    'ind_topico',
-                                                    'manifestações_clinicas',
-                                                  ),
-                                            ),
+                                            future: _loadSubtopicosByTopico(
+                                                'manifestações_clinicas'),
                                             builder: (context, snapshot) {
                                               // Customize what your widget looks like when it's loading.
                                               if (!snapshot.hasData) {
@@ -1672,18 +1748,8 @@ class _PDetalheInducaoWidgetState extends State<PDetalheInducaoWidget> {
                                           ),
                                           FutureBuilder<
                                               List<VwInducoesSubtopicosRow>>(
-                                            future: VwInducoesSubtopicosTable()
-                                                .queryRows(
-                                              queryFn: (q) => q
-                                                  .eqOrNull(
-                                                    'ind_id',
-                                                    widget!.id,
-                                                  )
-                                                  .eqOrNull(
-                                                    'ind_topico',
-                                                    'diagnostico',
-                                                  ),
-                                            ),
+                                            future: _loadSubtopicosByTopico(
+                                                'diagnostico'),
                                             builder: (context, snapshot) {
                                               // Customize what your widget looks like when it's loading.
                                               if (!snapshot.hasData) {

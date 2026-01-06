@@ -3,6 +3,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -80,8 +81,10 @@ class _CompMenuWidgetState extends State<CompMenuWidget> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8.0),
-                      child: Image.network(
-                        valueOrDefault<String>(
+                      child: CachedNetworkImage(
+                        fadeInDuration: Duration(milliseconds: 0),
+                        fadeOutDuration: Duration(milliseconds: 0),
+                        imageUrl: valueOrDefault<String>(
                           FFAppState().menu == 'inducao'
                               ? 'https://storage.googleapis.com/flutterflow-io-6f20.appspot.com/projects/m-c-guide-dose-0vlmcq/assets/14jhrexf8sj4/local_hospital_(2).png'
                               : 'https://storage.googleapis.com/flutterflow-io-6f20.appspot.com/projects/m-c-guide-dose-0vlmcq/assets/i5mj2yggyw6u/local_hospital_(1).png',
@@ -90,6 +93,13 @@ class _CompMenuWidgetState extends State<CompMenuWidget> {
                         width: 24.0,
                         height: 24.0,
                         fit: BoxFit.cover,
+                        errorWidget: (context, url, error) => Icon(
+                          Icons.local_hospital,
+                          color: FFAppState().menu == 'inducao'
+                              ? Color(0xFF5983B1)
+                              : Color(0xFF94A3B8),
+                          size: 24.0,
+                        ),
                       ),
                     ),
                     Text(
@@ -150,8 +160,10 @@ class _CompMenuWidgetState extends State<CompMenuWidget> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8.0),
-                      child: Image.network(
-                        valueOrDefault<String>(
+                      child: CachedNetworkImage(
+                        fadeInDuration: Duration(milliseconds: 0),
+                        fadeOutDuration: Duration(milliseconds: 0),
+                        imageUrl: valueOrDefault<String>(
                           FFAppState().menu == 'fisiologia'
                               ? 'https://storage.googleapis.com/flutterflow-io-6f20.appspot.com/projects/m-c-guide-dose-0vlmcq/assets/h86cuh8x6cmx/Activity_(1).png'
                               : 'https://storage.googleapis.com/flutterflow-io-6f20.appspot.com/projects/m-c-guide-dose-0vlmcq/assets/4ris1y5h5700/Activity.png',
@@ -160,6 +172,13 @@ class _CompMenuWidgetState extends State<CompMenuWidget> {
                         width: 24.0,
                         height: 24.0,
                         fit: BoxFit.cover,
+                        errorWidget: (context, url, error) => Icon(
+                          Icons.favorite_border,
+                          color: FFAppState().menu == 'fisiologia'
+                              ? Color(0xFF5983B1)
+                              : Color(0xFF94A3B8),
+                          size: 24.0,
+                        ),
                       ),
                     ),
                     Text(
@@ -251,8 +270,10 @@ class _CompMenuWidgetState extends State<CompMenuWidget> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8.0),
-                      child: Image.network(
-                        valueOrDefault<String>(
+                      child: CachedNetworkImage(
+                        fadeInDuration: Duration(milliseconds: 0),
+                        fadeOutDuration: Duration(milliseconds: 0),
+                        imageUrl: valueOrDefault<String>(
                           FFAppState().menu == 'drogas'
                               ? 'https://storage.googleapis.com/flutterflow-io-6f20.appspot.com/projects/m-c-guide-dose-0vlmcq/assets/qu5qkmct70qt/Medicine_(1).png'
                               : 'https://storage.googleapis.com/flutterflow-io-6f20.appspot.com/projects/m-c-guide-dose-0vlmcq/assets/6iw08txaoe99/Medicine.png',
@@ -261,6 +282,13 @@ class _CompMenuWidgetState extends State<CompMenuWidget> {
                         width: 24.0,
                         height: 24.0,
                         fit: BoxFit.cover,
+                        errorWidget: (context, url, error) => Icon(
+                          Icons.medication,
+                          color: FFAppState().menu == 'drogas'
+                              ? Color(0xFF5983B1)
+                              : Color(0xFF94A3B8),
+                          size: 24.0,
+                        ),
                       ),
                     ),
                     Text(
@@ -312,8 +340,10 @@ class _CompMenuWidgetState extends State<CompMenuWidget> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8.0),
-                      child: Image.network(
-                        valueOrDefault<String>(
+                      child: CachedNetworkImage(
+                        fadeInDuration: Duration(milliseconds: 0),
+                        fadeOutDuration: Duration(milliseconds: 0),
+                        imageUrl: valueOrDefault<String>(
                           FFAppState().menu == 'conta'
                               ? 'https://storage.googleapis.com/flutterflow-io-6f20.appspot.com/projects/m-c-guide-dose-0vlmcq/assets/u25p3xcjx6km/person_(1).png'
                               : 'https://storage.googleapis.com/flutterflow-io-6f20.appspot.com/projects/m-c-guide-dose-0vlmcq/assets/pcs06g33hrqw/person.png',
@@ -322,6 +352,13 @@ class _CompMenuWidgetState extends State<CompMenuWidget> {
                         width: 24.0,
                         height: 24.0,
                         fit: BoxFit.cover,
+                        errorWidget: (context, url, error) => Icon(
+                          Icons.person,
+                          color: FFAppState().menu == 'conta'
+                              ? Color(0xFF5983B1)
+                              : Color(0xFF94A3B8),
+                          size: 24.0,
+                        ),
                       ),
                     ),
                     Text(

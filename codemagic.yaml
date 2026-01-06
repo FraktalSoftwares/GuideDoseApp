@@ -1,15 +1,17 @@
 workflows:
   ios-workflow:
-    name: iOS Build and Deploy
+    name: iOS Build and Deploy to TestFlight
     max_build_duration: 60
     instance_type: mac_mini_m1
     environment:
       groups:
-        # Adicione suas variáveis de ambiente no Codemagic UI:
-        # - CERTIFICATE_PRIVATE_KEY (base64 do certificado .p12)
-        # - APP_STORE_CONNECT_ISSUER_ID
-        # - APP_STORE_CONNECT_KEY_IDENTIFIER
-        # - APP_STORE_CONNECT_PRIVATE_KEY (base64)
+        # Configure estas variáveis no Codemagic UI (Team settings > Environment variables):
+        # - APP_STORE_CONNECT_ISSUER_ID (obrigatório)
+        # - APP_STORE_CONNECT_KEY_IDENTIFIER (obrigatório)
+        # - APP_STORE_CONNECT_PRIVATE_KEY (obrigatório - conteúdo do arquivo .p8)
+        # - CERTIFICATE_PRIVATE_KEY (obrigatório - certificado .p12 em base64)
+        # - CERTIFICATE_PASSWORD (obrigatório - senha do certificado .p12)
+        # - PROVISIONING_PROFILE_SPECIFIER (opcional - nome do provisioning profile)
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -19,10 +21,10 @@ workflows:
           xcode-project use-profiles
       - name: Get Flutter packages
         script: |
-          flutter packages pub get
-      - name: Install pods
+          flutter pub get
+      - name: Install CocoaPods dependencies
         script: |
-          find . -name "Podfile" -execdir pod install \;
+          cd ios && pod install
       - name: Flutter build ipa
         script: |
           flutter build ipa --release \
@@ -30,7 +32,6 @@ workflows:
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-      - flutter_drive.log
     publishing:
       email:
         recipients:
@@ -39,7 +40,10 @@ workflows:
           success: true
           failure: true
       app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        auth: integration
+        # Usa as variáveis de ambiente configuradas acima
         submit_to_testflight: true
+        beta_groups:
+          # Adicione os nomes dos grupos de teste do TestFlight aqui (opcional)
+          # - "Internal Testers"
+          # - "External Testers"

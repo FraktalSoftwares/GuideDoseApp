@@ -1,4 +1,6 @@
 import '/backend/supabase/supabase.dart';
+import '/backend/offline/sync_manager.dart';
+import '/backend/offline/offline_database.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -47,15 +49,97 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
     super.dispose();
   }
 
+  Future<Map<String, dynamic>?> _loadMedicamentoDetails() async {
+    final syncManager = SyncManager.instance;
+
+    print('🔍 Carregando detalhes do medicamento ID: ${widget.id}');
+    print('📡 Status online: ${syncManager.isOnline}');
+
+    if (syncManager.isOnline) {
+      // Online: busca do Supabase
+      try {
+        print('🌐 Buscando do Supabase...');
+        final rows = await MedicamentosTable().querySingleRow(
+          queryFn: (q) => q.eqOrNull('id', widget.id),
+        );
+        print('📦 Rows recebidos: ${rows?.length ?? 0}');
+        if (rows != null && rows.isNotEmpty) {
+          final row = rows.first;
+          print('✅ Medicamento encontrado online: ${row.ptNomePrincipioAtivo}');
+          return {
+            'pt_nome_principio_ativo': row.ptNomePrincipioAtivo,
+            'us_nome_principio_ativo': row.usNomePrincipioAtivo,
+            'es_nome_principio_ativo': row.esNomePrincipioAtivo,
+            'pt_nome_comercial': row.ptNomeComercial,
+            'us_nome_comercial': row.usNomeComercial,
+            'es_nome_comercial': row.esNomeComercial,
+            'pt_classificacao': row.ptClassificacao,
+            'us_classificacao': row.usClassificacao,
+            'es_classificacao': row.esClassificacao,
+            'pt_mecanismo_acao': row.ptMecanismoAcao,
+            'us_mecanismo_acao': row.usMecanismoAcao,
+            'es_mecanismo_acao': row.esMecanismoAcao,
+            'pt_farmacocinetica': row.ptFarmacocinetica,
+            'us_farmacocinetica': row.usFarmacocinetica,
+            'es_farmacocinetica': row.esFarmacocinetica,
+            'pt_indicacoes': row.ptIndicacoes,
+            'us_indicacoes': row.usIndicacoes,
+            'es_indicacoes': row.esIndicacoes,
+            'pt_posologia': row.ptPosologia,
+            'us_posologia': row.usPosologia,
+            'es_posologia': row.esPosologia,
+            'pt_administracao': row.ptAdministracao,
+            'us_administracao': row.usAdministracao,
+            'es_administracao': row.esAdministracao,
+            'pt_dose_minima': row.ptDoseMinima,
+            'us_dose_minima': row.usDoseMinima,
+            'es_dose_minima': row.esDoseMinima,
+            'pt_dose_maxima': row.ptDoseMaxima,
+            'us_dose_maxima': row.usDoseMaxima,
+            'es_dose_maxima': row.esDoseMaxima,
+            'pt_ajuste_renal': row.ptAjusteRenal,
+            'us_ajuste_renal': row.usAjusteRenal,
+            'es_ajuste_renal': row.esAjusteRenal,
+            'pt_apresentacao': row.ptApresentacao,
+            'us_apresentacao': row.usApresentacao,
+            'es_apresentacao': row.esApresentacao,
+            'pt_preparo': row.ptPreparo,
+            'us_preparo': row.usPreparo,
+            'es_preparo': row.esPreparo,
+            'pt_inicio_acao': row.ptInicioAcao,
+            'us_inicio_acao': row.usInicioAcao,
+            'es_inicio_acao': row.esInicioAcao,
+            'pt_tempo_pico': row.ptTempoPico,
+            'us_tempo_pico': row.usTempoPico,
+            'es_tempo_pico': row.esTempoPico,
+            'pt_meia_vida': row.ptMeiaVida,
+            'us_meia_vida': row.usMeiaVida,
+            'es_meia_vida': row.esMeiaVida,
+          };
+        }
+        print('⚠️ Nenhum medicamento encontrado online');
+      } catch (e) {
+        print('❌ Erro ao buscar medicamento online: $e');
+      }
+    }
+
+    // Offline ou falhou online: busca do cache
+    print('💾 Buscando do cache local...');
+    final cached =
+        await OfflineDatabase.instance.getMedicamentoById(widget.id!);
+    if (cached != null) {
+      print('✅ Medicamento encontrado no cache: ${cached['nome']}');
+      print('📋 Campos disponíveis: ${cached.keys.toList()}');
+    } else {
+      print('❌ Medicamento NÃO encontrado no cache');
+    }
+    return cached;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<MedicamentosRow>>(
-      future: MedicamentosTable().querySingleRow(
-        queryFn: (q) => q.eqOrNull(
-          'id',
-          widget!.id,
-        ),
-      ),
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _loadMedicamentoDetails(),
       builder: (context, snapshot) {
         // Customize what your widget looks like when it's loading.
         if (!snapshot.hasData) {
@@ -70,11 +154,8 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
             ),
           );
         }
-        List<MedicamentosRow> containerMedicamentosRowList = snapshot.data!;
 
-        final containerMedicamentosRow = containerMedicamentosRowList.isNotEmpty
-            ? containerMedicamentosRowList.first
-            : null;
+        final medicamento = snapshot.data;
 
         return Container(
           width: double.infinity,
@@ -157,12 +238,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                           Text(
                             valueOrDefault<String>(
                               FFLocalizations.of(context).getVariableText(
-                                ptText: containerMedicamentosRow
-                                    ?.ptNomePrincipioAtivo,
-                                enText: containerMedicamentosRow
-                                    ?.usNomePrincipioAtivo,
-                                esText: containerMedicamentosRow
-                                    ?.esNomePrincipioAtivo,
+                                ptText: medicamento?['pt_nome_principio_ativo'],
+                                enText: medicamento?['us_nome_principio_ativo'],
+                                esText: medicamento?['es_nome_principio_ativo'],
                               ),
                               'Indefinido',
                             ),
@@ -209,12 +287,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                           Text(
                             valueOrDefault<String>(
                               FFLocalizations.of(context).getVariableText(
-                                ptText: containerMedicamentosRow
-                                    ?.ptNomePrincipioAtivo,
-                                enText: containerMedicamentosRow
-                                    ?.usNomePrincipioAtivo,
-                                esText: containerMedicamentosRow
-                                    ?.esNomePrincipioAtivo,
+                                ptText: medicamento?['pt_nome_principio_ativo'],
+                                enText: medicamento?['us_nome_principio_ativo'],
+                                esText: medicamento?['es_nome_principio_ativo'],
                               ),
                               'Indefinido',
                             ),
@@ -266,12 +341,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                           Text(
                             valueOrDefault<String>(
                               FFLocalizations.of(context).getVariableText(
-                                ptText:
-                                    containerMedicamentosRow?.ptNomeComercial,
-                                enText:
-                                    containerMedicamentosRow?.usNomeComercial,
-                                esText:
-                                    containerMedicamentosRow?.esNomeComercial,
+                                ptText: medicamento?['pt_nome_comercial'],
+                                enText: medicamento?['us_nome_comercial'],
+                                esText: medicamento?['es_nome_comercial'],
                               ),
                               'Indefinido',
                             ),
@@ -323,12 +395,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                           Text(
                             valueOrDefault<String>(
                               FFLocalizations.of(context).getVariableText(
-                                ptText:
-                                    containerMedicamentosRow?.ptClassificacao,
-                                enText:
-                                    containerMedicamentosRow?.usClassificacao,
-                                esText:
-                                    containerMedicamentosRow?.esClassificacao,
+                                ptText: medicamento?['pt_classificacao'],
+                                enText: medicamento?['us_classificacao'],
+                                esText: medicamento?['es_classificacao'],
                               ),
                               'Indefinido',
                             ),
@@ -378,12 +447,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                           Text(
                             valueOrDefault<String>(
                               FFLocalizations.of(context).getVariableText(
-                                ptText:
-                                    containerMedicamentosRow?.ptMecanismoAcao,
-                                enText:
-                                    containerMedicamentosRow?.usMecanismoAcao,
-                                esText:
-                                    containerMedicamentosRow?.esMecanismoAcao,
+                                ptText: medicamento?['pt_mecanismo_acao'],
+                                enText: medicamento?['us_mecanismo_acao'],
+                                esText: medicamento?['es_mecanismo_acao'],
                               ),
                               'Indefinido',
                             ),
@@ -435,12 +501,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                           Text(
                             valueOrDefault<String>(
                               FFLocalizations.of(context).getVariableText(
-                                ptText:
-                                    containerMedicamentosRow?.ptFarmacocinetica,
-                                enText:
-                                    containerMedicamentosRow?.usFarmacocinetica,
-                                esText:
-                                    containerMedicamentosRow?.esFarmacocinetica,
+                                ptText: medicamento?['pt_farmacocinetica'],
+                                enText: medicamento?['us_farmacocinetica'],
+                                esText: medicamento?['es_farmacocinetica'],
                               ),
                               'Indefinido',
                             ),
@@ -492,9 +555,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                           Text(
                             valueOrDefault<String>(
                               FFLocalizations.of(context).getVariableText(
-                                ptText: containerMedicamentosRow?.ptIndicacoes,
-                                enText: containerMedicamentosRow?.usIndicacoes,
-                                esText: containerMedicamentosRow?.esIndicacoes,
+                                ptText: medicamento?['pt_indicacoes'],
+                                enText: medicamento?['us_indicacoes'],
+                                esText: medicamento?['es_indicacoes'],
                               ),
                               'Indefinido',
                             ),
@@ -546,9 +609,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                           Text(
                             valueOrDefault<String>(
                               FFLocalizations.of(context).getVariableText(
-                                ptText: containerMedicamentosRow?.ptPosologia,
-                                enText: containerMedicamentosRow?.usPosologia,
-                                esText: containerMedicamentosRow?.esPosologia,
+                                ptText: medicamento?['pt_posologia'],
+                                enText: medicamento?['us_posologia'],
+                                esText: medicamento?['es_posologia'],
                               ),
                               'Indefinido',
                             ),
@@ -600,12 +663,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                           Text(
                             valueOrDefault<String>(
                               FFLocalizations.of(context).getVariableText(
-                                ptText:
-                                    containerMedicamentosRow?.ptAdministracao,
-                                enText:
-                                    containerMedicamentosRow?.usAdministracao,
-                                esText:
-                                    containerMedicamentosRow?.esAdministracao,
+                                ptText: medicamento?['pt_administracao'],
+                                enText: medicamento?['us_administracao'],
+                                esText: medicamento?['es_administracao'],
                               ),
                               'Indefinido',
                             ),
@@ -661,12 +721,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText:
-                                        containerMedicamentosRow?.ptDoseMaxima,
-                                    enText:
-                                        containerMedicamentosRow?.usDoseMaxima,
-                                    esText:
-                                        containerMedicamentosRow?.esDoseMaxima,
+                                    ptText: medicamento?['pt_dose_maxima'],
+                                    enText: medicamento?['us_dose_maxima'],
+                                    esText: medicamento?['es_dose_maxima'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -724,12 +781,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText:
-                                        containerMedicamentosRow?.ptDoseMinima,
-                                    enText:
-                                        containerMedicamentosRow?.usDoseMinima,
-                                    esText:
-                                        containerMedicamentosRow?.esDoseMinima,
+                                    ptText: medicamento?['pt_dose_minima'],
+                                    enText: medicamento?['us_dose_minima'],
+                                    esText: medicamento?['es_dose_minima'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -787,12 +841,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptReacoesAdversas,
-                                    enText: containerMedicamentosRow
-                                        ?.usReacoesAdversas,
-                                    esText: containerMedicamentosRow
-                                        ?.esReacoesAdversas,
+                                    ptText: medicamento?['pt_reacoes_adversas'],
+                                    enText: medicamento?['us_reacoes_adversas'],
+                                    esText: medicamento?['es_reacoes_adversas'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -850,12 +901,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptRiscoGravidez,
-                                    enText: containerMedicamentosRow
-                                        ?.usRiscoGravidez,
-                                    esText: containerMedicamentosRow
-                                        ?.esRiscoGravidez,
+                                    ptText: medicamento?['pt_risco_gravidez'],
+                                    enText: medicamento?['us_risco_gravidez'],
+                                    esText: medicamento?['es_risco_gravidez'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -913,12 +961,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptRiscoLactacao,
-                                    enText: containerMedicamentosRow
-                                        ?.usRiscoLactacao,
-                                    esText: containerMedicamentosRow
-                                        ?.esRiscoLactacao,
+                                    ptText: medicamento?['pt_risco_lactacao'],
+                                    enText: medicamento?['us_risco_lactacao'],
+                                    esText: medicamento?['es_risco_lactacao'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -976,12 +1021,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText:
-                                        containerMedicamentosRow?.ptAjusteRenal,
-                                    enText:
-                                        containerMedicamentosRow?.usAjusteRenal,
-                                    esText:
-                                        containerMedicamentosRow?.esAjusteRenal,
+                                    ptText: medicamento?['pt_ajuste_renal'],
+                                    enText: medicamento?['us_ajuste_renal'],
+                                    esText: medicamento?['es_ajuste_renal'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1039,12 +1081,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptAjusteHepatico,
-                                    enText: containerMedicamentosRow
-                                        ?.usAjusteHepatico,
-                                    esText: containerMedicamentosRow
-                                        ?.esAjusteHepatico,
+                                    ptText: medicamento?['pt_ajuste_hepatico'],
+                                    enText: medicamento?['us_ajuste_hepatico'],
+                                    esText: medicamento?['es_ajuste_hepatico'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1102,12 +1141,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptContraindicacoes,
-                                    enText: containerMedicamentosRow
-                                        ?.usContraindicacoes,
-                                    esText: containerMedicamentosRow
-                                        ?.esContraindicacoes,
+                                    ptText: medicamento?['pt_contraindicacoes'],
+                                    enText: medicamento?['us_contraindicacoes'],
+                                    esText: medicamento?['es_contraindicacoes'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1165,12 +1201,12 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptInteracaoMedicamento,
-                                    enText: containerMedicamentosRow
-                                        ?.usInteracaoMedicamento,
-                                    esText: containerMedicamentosRow
-                                        ?.esInteracaoMedicamento,
+                                    ptText: medicamento?[
+                                        'pt_interacao_medicamento'],
+                                    enText: medicamento?[
+                                        'us_interacao_medicamento'],
+                                    esText: medicamento?[
+                                        'es_interacao_medicamento'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1228,12 +1264,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptApresentacao,
-                                    enText: containerMedicamentosRow
-                                        ?.usApresentacao,
-                                    esText: containerMedicamentosRow
-                                        ?.esApresentacao,
+                                    ptText: medicamento?['pt_apresentacao'],
+                                    enText: medicamento?['us_apresentacao'],
+                                    esText: medicamento?['es_apresentacao'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1291,9 +1324,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow?.ptPreparo,
-                                    enText: containerMedicamentosRow?.usPreparo,
-                                    esText: containerMedicamentosRow?.esPreparo,
+                                    ptText: medicamento?['pt_preparo'],
+                                    enText: medicamento?['us_preparo'],
+                                    esText: medicamento?['es_preparo'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1351,12 +1384,12 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptSolucoesCompativeis,
-                                    enText: containerMedicamentosRow
-                                        ?.usSolucoesCompativeis,
-                                    esText: containerMedicamentosRow
-                                        ?.esSolucoesCompativeis,
+                                    ptText:
+                                        medicamento?['pt_solucoes_compativeis'],
+                                    enText:
+                                        medicamento?['us_solucoes_compativeis'],
+                                    esText:
+                                        medicamento?['es_solucoes_compativeis'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1414,12 +1447,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptArmazenamento,
-                                    enText: containerMedicamentosRow
-                                        ?.usArmazenamento,
-                                    esText: containerMedicamentosRow
-                                        ?.esArmazenamento,
+                                    ptText: medicamento?['pt_armazenamento'],
+                                    enText: medicamento?['us_armazenamento'],
+                                    esText: medicamento?['es_armazenamento'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1477,12 +1507,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptCuidadosMedicos,
-                                    enText: containerMedicamentosRow
-                                        ?.usCuidadosMedicos,
-                                    esText: containerMedicamentosRow
-                                        ?.esCuidadosMedicos,
+                                    ptText: medicamento?['pt_cuidados_medicos'],
+                                    enText: medicamento?['us_cuidados_medicos'],
+                                    esText: medicamento?['es_cuidados_medicos'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1540,12 +1567,12 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptCuidadosFarmaceuticos,
-                                    enText: containerMedicamentosRow
-                                        ?.usCuidadosFarmaceuticos,
-                                    esText: containerMedicamentosRow
-                                        ?.esCuidadosFarmaceuticos,
+                                    ptText: medicamento?[
+                                        'pt_cuidados_farmaceuticos'],
+                                    enText: medicamento?[
+                                        'us_cuidados_farmaceuticos'],
+                                    esText: medicamento?[
+                                        'es_cuidados_farmaceuticos'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1603,12 +1630,12 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptCuidadosEnfermagem,
-                                    enText: containerMedicamentosRow
-                                        ?.usCuidadosEnfermagem,
-                                    esText: containerMedicamentosRow
-                                        ?.esCuidadosEnfermagem,
+                                    ptText:
+                                        medicamento?['pt_cuidados_enfermagem'],
+                                    enText:
+                                        medicamento?['us_cuidados_enfermagem'],
+                                    esText:
+                                        medicamento?['es_cuidados_enfermagem'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1666,12 +1693,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText:
-                                        containerMedicamentosRow?.ptInicioAcao,
-                                    enText:
-                                        containerMedicamentosRow?.usInicioAcao,
-                                    esText:
-                                        containerMedicamentosRow?.esInicioAcao,
+                                    ptText: medicamento?['pt_inicio_acao'],
+                                    enText: medicamento?['us_inicio_acao'],
+                                    esText: medicamento?['es_inicio_acao'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1729,12 +1753,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText:
-                                        containerMedicamentosRow?.ptTempoPico,
-                                    enText:
-                                        containerMedicamentosRow?.usTempoPico,
-                                    esText:
-                                        containerMedicamentosRow?.esTempoPico,
+                                    ptText: medicamento?['pt_tempo_pico'],
+                                    enText: medicamento?['us_tempo_pico'],
+                                    esText: medicamento?['es_tempo_pico'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1792,12 +1813,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText:
-                                        containerMedicamentosRow?.ptMeiaVida,
-                                    enText:
-                                        containerMedicamentosRow?.usMeiaVida,
-                                    esText:
-                                        containerMedicamentosRow?.esMeiaVida,
+                                    ptText: medicamento?['pt_meia_vida'],
+                                    enText: medicamento?['us_meia_vida'],
+                                    esText: medicamento?['es_meia_vida'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1855,12 +1873,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptEfeitoClinico,
-                                    enText: containerMedicamentosRow
-                                        ?.usEfeitoClinico,
-                                    esText: containerMedicamentosRow
-                                        ?.esEfeitoClinico,
+                                    ptText: medicamento?['pt_efeito_clinico'],
+                                    enText: medicamento?['us_efeito_clinico'],
+                                    esText: medicamento?['es_efeito_clinico'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1918,12 +1933,9 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptViaEliminacao,
-                                    enText: containerMedicamentosRow
-                                        ?.usViaEliminacao,
-                                    esText: containerMedicamentosRow
-                                        ?.esViaEliminacao,
+                                    ptText: medicamento?['pt_via_eliminacao'],
+                                    enText: medicamento?['us_via_eliminacao'],
+                                    esText: medicamento?['es_via_eliminacao'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -1981,12 +1993,12 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptEstabilidadePosDiluicao,
-                                    enText: containerMedicamentosRow
-                                        ?.usEstabilidadePosDiluicao,
-                                    esText: containerMedicamentosRow
-                                        ?.esEstabilidadePosDiluicao,
+                                    ptText: medicamento?[
+                                        'pt_estabilidade_pos_diluicao'],
+                                    enText: medicamento?[
+                                        'us_estabilidade_pos_diluicao'],
+                                    esText: medicamento?[
+                                        'es_estabilidade_pos_diluicao'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -2044,12 +2056,12 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptPrecaucoesEspecificas,
-                                    enText: containerMedicamentosRow
-                                        ?.usPrecaucoesEspecificas,
-                                    esText: containerMedicamentosRow
-                                        ?.esPrecaucoesEspecificas,
+                                    ptText: medicamento?[
+                                        'pt_precaucoes_especificas'],
+                                    enText: medicamento?[
+                                        'us_precaucoes_especificas'],
+                                    esText: medicamento?[
+                                        'es_precaucoes_especificas'],
                                   ),
                                   'Indefinido',
                                 ),
@@ -2107,12 +2119,12 @@ class _PDetalheMedicamentoWidgetState extends State<PDetalheMedicamentoWidget> {
                               Text(
                                 valueOrDefault<String>(
                                   FFLocalizations.of(context).getVariableText(
-                                    ptText: containerMedicamentosRow
-                                        ?.ptFontesBibliograficas,
-                                    enText: containerMedicamentosRow
-                                        ?.usFontesBibliograficas,
-                                    esText: containerMedicamentosRow
-                                        ?.esFontesBibliograficas,
+                                    ptText: medicamento?[
+                                        'pt_fontes_bibliograficas'],
+                                    enText: medicamento?[
+                                        'us_fontes_bibliograficas'],
+                                    esText: medicamento?[
+                                        'es_fontes_bibliograficas'],
                                   ),
                                   'Indefinido',
                                 ),

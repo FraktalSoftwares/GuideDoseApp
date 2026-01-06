@@ -1,8 +1,9 @@
 import '/backend/supabase/supabase.dart';
+import '/backend/offline/sync_manager.dart';
+import '/backend/offline/offline_database.dart';
 import '/components/p_empty_list/p_empty_list_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
@@ -49,17 +50,89 @@ class _PAccordeonInducaoWidgetState extends State<PAccordeonInducaoWidget> {
     super.dispose();
   }
 
+  // Método helper para carregar dados do accordion (online ou offline)
+  Future<List<Map<String, dynamic>>> _loadAccordeonData() async {
+    print(
+        '🔍 ACCORDION: Iniciando carregamento para indução ${widget.idInducao}');
+    final syncManager = SyncManager.instance;
+    print('📡 ACCORDION: Status online: ${syncManager.isOnline}');
+
+    if (syncManager.isOnline) {
+      try {
+        print('🌐 ACCORDION: Buscando online para indução ${widget.idInducao}');
+        final rows = await AccordeonInducaoTable().queryRows(
+          queryFn: (q) => q.eqOrNull('inducao_id', widget.idInducao),
+        );
+
+        print('✅ ACCORDION: Encontrados ${rows.length} itens online');
+        if (rows.isNotEmpty) {
+          print('📋 ACCORDION: Primeiro item: ${rows.first.medNome}');
+        }
+
+        // Converte AccordeonInducaoRow para Map
+        final allItems = rows
+            .map((row) => {
+                  'med_nome': row.medNome,
+                  'med_nome_en': row.medNomeEn,
+                  'med_nome_es': row.medNomeEs,
+                  'dose_mg_kg': row.doseMgKg,
+                  'concentracao_mg_ml': row.concentracaoMgMl,
+                })
+            .toList();
+
+        // Remove duplicatas baseado no nome do medicamento
+        final uniqueItems = <String, Map<String, dynamic>>{};
+        for (var item in allItems) {
+          final key = '${item['med_nome']}_${item['dose_mg_kg']}';
+          if (!uniqueItems.containsKey(key)) {
+            uniqueItems[key] = item;
+          }
+        }
+
+        final result = uniqueItems.values.toList();
+        print(
+            '🎯 ACCORDION: Retornando ${result.length} itens (${allItems.length} antes de remover duplicatas)');
+        return result;
+      } catch (e) {
+        print('❌ ACCORDION: Erro ao buscar online: $e');
+        return [];
+      }
+    }
+
+    // Offline: busca do cache
+    try {
+      print('💾 ACCORDION: Buscando do cache para indução ${widget.idInducao}');
+      final cached = await OfflineDatabase.instance
+          .getAccordeonByInducaoId(widget.idInducao!);
+      print('✅ ACCORDION: Encontrados ${cached.length} itens no cache');
+      if (cached.isNotEmpty) {
+        print('📋 ACCORDION: Primeiro item: ${cached.first['med_nome']}');
+      }
+
+      // Remove duplicatas baseado no nome do medicamento
+      final uniqueItems = <String, Map<String, dynamic>>{};
+      for (var item in cached) {
+        final key = '${item['med_nome']}_${item['dose_mg_kg']}';
+        if (!uniqueItems.containsKey(key)) {
+          uniqueItems[key] = item;
+        }
+      }
+
+      final result = uniqueItems.values.toList();
+      print('🎯 ACCORDION: Após remover duplicatas: ${result.length} itens');
+      return result;
+    } catch (e) {
+      print('❌ ACCORDION: Erro ao buscar do cache: $e');
+      return [];
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
 
-    return FutureBuilder<List<AccordeonInducaoRow>>(
-      future: AccordeonInducaoTable().queryRows(
-        queryFn: (q) => q.eqOrNull(
-          'inducao_id',
-          widget!.idInducao,
-        ),
-      ),
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _loadAccordeonData(),
       builder: (context, snapshot) {
         // Customize what your widget looks like when it's loading.
         if (!snapshot.hasData) {
@@ -74,7 +147,7 @@ class _PAccordeonInducaoWidgetState extends State<PAccordeonInducaoWidget> {
             ),
           );
         }
-        List<AccordeonInducaoRow> containerAccordeonInducaoRowList =
+        List<Map<String, dynamic>> containerAccordeonInducaoRowList =
             snapshot.data!;
 
         return Container(
@@ -150,9 +223,9 @@ class _PAccordeonInducaoWidgetState extends State<PAccordeonInducaoWidget> {
                           Text(
                             valueOrDefault<String>(
                               FFLocalizations.of(context).getVariableText(
-                                ptText: remediosItem.medNome,
-                                enText: remediosItem.medNomeEn,
-                                esText: remediosItem.medNomeEs,
+                                ptText: remediosItem['med_nome'] ?? '',
+                                enText: remediosItem['med_nome_en'] ?? '',
+                                esText: remediosItem['med_nome_es'] ?? '',
                               ),
                               '-',
                             ),
@@ -181,7 +254,7 @@ class _PAccordeonInducaoWidgetState extends State<PAccordeonInducaoWidget> {
                           Flexible(
                             child: Text(
                               valueOrDefault<String>(
-                                '${functions.calcularDoseMg(FFAppState().User.uSRKGs, remediosItem.doseMgKg)} / ${functions.calcularVolumeMlComPeso(remediosItem.doseMgKg, remediosItem.concentracaoMgMl, FFAppState().User.uSRKGs)}',
+                                '${functions.calcularDoseMg(FFAppState().User.uSRKGs, remediosItem['dose_mg_kg'] ?? 0.0)} / ${functions.calcularVolumeMlComPeso(remediosItem['dose_mg_kg'] ?? 0.0, remediosItem['concentracao_mg_ml'] ?? 0.0, FFAppState().User.uSRKGs)}',
                                 '-',
                               ),
                               style: FlutterFlowTheme.of(context)
