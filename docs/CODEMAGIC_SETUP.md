@@ -28,7 +28,7 @@ Este guia explica passo a passo como configurar o Codemagic para fazer build e d
 
 ## 🔑 Passo 2: Criar Certificado de Distribuição
 
-1. Acesse: https://developer.apple.com/account/resources/certificates
+1. Acesse:  
 2. Clique em **"+"** para criar novo certificado
 3. Selecione **"iOS Distribution"**
 4. Siga as instruções para criar o certificado
