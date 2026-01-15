@@ -101,43 +101,34 @@ jobs:
           echo "ipa_path=$IPA_FILE" >> $GITHUB_OUTPUT
           echo "IPA encontrado: $IPA_FILE"
 
+      - name: Setup App Store Connect API Key
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        run: |
+          echo "$APP_STORE_CONNECT_API_KEY" > AuthKey_$APP_STORE_CONNECT_KEY_ID.p8
+          mkdir -p ~/.appstoreconnect/private_keys
+          mv AuthKey_$APP_STORE_CONNECT_KEY_ID.p8 ~/.appstoreconnect/private_keys/
+          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8
+          echo "✅ API Key configurada"
+
       - name: Upload IPA to TestFlight
         if: github.event.inputs.deploy_to_app_store != 'true'
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APP_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          echo "📤 Enviando para TestFlight..."
-          xcrun altool --upload-app \
-            --type ios \
-            --file "${{ steps.find_ipa.outputs.ipa_path }}" \
-            --username "$APPLE_ID" \
-            --password "$APP_SPECIFIC_PASSWORD" \
-            --asc-provider "$APPLE_TEAM_ID" || {
-              echo "❌ Erro ao enviar para TestFlight"
-              exit 1
-            }
-          echo "✅ Enviado para TestFlight com sucesso!"
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: "${{ steps.find_ipa.outputs.ipa_path }}"
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
 
       - name: Upload IPA to App Store
         if: github.event.inputs.deploy_to_app_store == 'true'
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APP_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          echo "📤 Enviando para App Store..."
-          xcrun altool --upload-app \
-            --type ios \
-            --file "${{ steps.find_ipa.outputs.ipa_path }}" \
-            --username "$APPLE_ID" \
-            --password "$APP_SPECIFIC_PASSWORD" \
-            --asc-provider "$APPLE_TEAM_ID" || {
-              echo "❌ Erro ao enviar para App Store"
-              exit 1
-            }
-          echo "✅ Enviado para App Store com sucesso!"
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: "${{ steps.find_ipa.outputs.ipa_path }}"
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4

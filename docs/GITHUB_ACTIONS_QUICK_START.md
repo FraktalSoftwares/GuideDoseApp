@@ -7,15 +7,15 @@
 Configure estes secrets no GitHub:
 - Settings > Secrets and variables > Actions > New repository secret
 
-| Secret | O que é |
-|--------|---------|
-| `APPLE_CERTIFICATE_BASE64` | Certificado `.p12` em base64 |
-| `APPLE_CERTIFICATE_PASSWORD` | Senha do certificado `.p12` |
-| `APPLE_PROVISIONING_PROFILE_BASE64` | Profile `.mobileprovision` em base64 |
-| `APPLE_TEAM_ID` | Team ID (encontre em developer.apple.com) |
-| `APPLE_ID` | Email da conta Apple Developer |
-| `APP_SPECIFIC_PASSWORD` | App-Specific Password (appleid.apple.com) |
-| `KEYCHAIN_PASSWORD` | Qualquer senha temporária (ex: `temp123`) |
+| Secret | O que é | Valor GuideDose |
+|--------|---------|-----------------|
+| `APPLE_CERTIFICATE_BASE64` | Certificado `.p12` em base64 | (converter) |
+| `APPLE_CERTIFICATE_PASSWORD` | Senha do certificado `.p12` | (sua senha) |
+| `APPLE_PROVISIONING_PROFILE_BASE64` | Profile `.mobileprovision` em base64 | (converter) |
+| `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID da API Key | `044c0b43-edab-4738-aaad-b1dbfe1928f6` |
+| `APP_STORE_CONNECT_KEY_ID` | Key ID da API Key | `3WPT9X8U4F` |
+| `APP_STORE_CONNECT_API_KEY` | Arquivo `.p8` em base64 | (converter AuthKey_3WPT9X8U4F.p8) |
+| `KEYCHAIN_PASSWORD` | Qualquer senha temporária | `temp123` |
 
 ### 2. Converter para Base64 (PowerShell)
 
@@ -25,6 +25,9 @@ Configure estes secrets no GitHub:
 
 # Provisioning Profile
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("profile.mobileprovision"))
+
+# API Key (.p8) - IMPORTANTE: inclui BEGIN/END
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("AuthKey_3WPT9X8U4F.p8"))
 ```
 
 ### 3. Executar

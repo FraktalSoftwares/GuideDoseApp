@@ -31,19 +31,27 @@ Este guia explica como configurar o GitHub Actions para fazer build e deploy aut
 3. Bundle ID: `com.mycompany.mcguidedose.apps`
 4. Baixe o arquivo `.mobileprovision`
 
-### 1.3. App Store Connect API Key (Recomendado)
+### 1.3. App Store Connect API Key (Recomendado) ✅
 
-1. Acesse: https://appstoreconnect.apple.com/access/api
-2. Crie uma API Key com permissão **"Developer"** ou **"Admin"**
-3. Baixe o arquivo `.p8` (você só pode baixar uma vez!)
-4. Anote:
-   - **Key ID** (ex: `ABC123XYZ`)
-   - **Issuer ID** (ex: `12345678-1234-1234-1234-123456789012`)
+**Você já tem a API Key configurada!**
 
-**Alternativa:** Se não usar API Key, você precisará de um **App-Specific Password**:
-1. Acesse: https://appleid.apple.com/account/manage
-2. Em "Security" > "App-Specific Passwords"
-3. Gere uma nova senha para "GitHub Actions"
+- **Arquivo:** `AuthKey_3WPT9X8U4F.p8`
+- **Key ID:** `3WPT9X8U4F`
+- **Issuer ID:** `044c0b43-edab-4738-aaad-b1dbfe1928f6`
+
+**Para converter o arquivo .p8 para base64:**
+
+No Windows (PowerShell):
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("AuthKey_3WPT9X8U4F.p8"))
+```
+
+No Mac/Linux:
+```bash
+base64 -i AuthKey_3WPT9X8U4F.p8
+```
+
+**Copie o conteúdo base64 completo** (incluindo `-----BEGIN PRIVATE KEY-----` e `-----END PRIVATE KEY-----`) para usar no secret `APP_STORE_CONNECT_API_KEY`.
 
 ---
 
@@ -81,22 +89,24 @@ base64 -i profile.mobileprovision -o profile_base64.txt
 
 ### Secrets Obrigatórios:
 
-| Nome do Secret | Descrição | Exemplo |
-|---------------|-----------|---------|
-| `APPLE_CERTIFICATE_BASE64` | Certificado `.p12` em base64 | `MIIKpAIBAzCCCl...` |
-| `APPLE_CERTIFICATE_PASSWORD` | Senha do certificado `.p12` | `sua_senha_aqui` |
-| `APPLE_PROVISIONING_PROFILE_BASE64` | Provisioning profile em base64 | `MIIKpAIBAzCCCl...` |
-| `APPLE_TEAM_ID` | Team ID da Apple Developer | `ABC123XYZ` |
-| `APPLE_ID` | Email da conta Apple Developer | `seu@email.com` |
-| `APP_SPECIFIC_PASSWORD` | App-Specific Password (ou senha da API Key) | `abcd-efgh-ijkl-mnop` |
-| `KEYCHAIN_PASSWORD` | Senha temporária para keychain | `senha_temporaria_123` |
+| Nome do Secret | Descrição | Valor para GuideDose |
+|---------------|-----------|----------------------|
+| `APPLE_CERTIFICATE_BASE64` | Certificado `.p12` em base64 | (converter seu certificado) |
+| `APPLE_CERTIFICATE_PASSWORD` | Senha do certificado `.p12` | (sua senha) |
+| `APPLE_PROVISIONING_PROFILE_BASE64` | Provisioning profile em base64 | (converter seu profile) |
+| `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID da API Key | `044c0b43-edab-4738-aaad-b1dbfe1928f6` |
+| `APP_STORE_CONNECT_KEY_ID` | Key ID da API Key | `3WPT9X8U4F` |
+| `APP_STORE_CONNECT_API_KEY` | Conteúdo do arquivo `.p8` em base64 | (converter AuthKey_3WPT9X8U4F.p8) |
+| `KEYCHAIN_PASSWORD` | Senha temporária para keychain | `temp123` (qualquer senha) |
 
 ### Secrets Opcionais:
 
 | Nome do Secret | Descrição | Quando usar |
 |----------------|-----------|-------------|
-| `APPLE_APP_ID` | App ID do App Store Connect | Se quiser validação adicional |
+| `APPLE_APP_ID` | App ID do App Store Connect | Não necessário (opcional) |
 | `PROVISIONING_PROFILE_SPECIFIER` | Nome do provisioning profile | Se tiver múltiplos profiles |
+
+**Nota:** O workflow usa a **App Store Connect API Key** (método moderno) em vez de App-Specific Password. Isso é mais seguro e recomendado pela Apple.
 
 ---
 
