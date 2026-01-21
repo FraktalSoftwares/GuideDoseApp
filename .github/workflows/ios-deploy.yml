@@ -62,20 +62,51 @@ jobs:
         run: |
           echo "📥 Importando certificado..."
           echo "$CERTIFICATE_BASE64" | base64 --decode > certificate.p12
-          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          
+          # Verificar se o arquivo foi criado
+          if [ ! -f certificate.p12 ]; then
+            echo "❌ Erro: Arquivo certificate.p12 não foi criado"
+            exit 1
+          fi
+          
+          echo "📦 Tamanho do arquivo: $(ls -lh certificate.p12 | awk '{print $5}')"
+          
+          # Importar certificado
+          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security || {
+            echo "❌ Erro ao importar certificado"
+            exit 1
+          }
+          
+          # Configurar permissões
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          
+          # Desbloquear keychain
           security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          
+          # Verificar importação imediatamente
+          echo "🔍 Verificando certificado importado..."
+          security find-identity -v -p codesigning build.keychain
+          
           rm certificate.p12
           echo "✅ Certificado importado"
 
       - name: Verify certificate import
         run: |
           echo "🔍 Verificando certificados importados no keychain..."
-          echo "--- Certificados no build.keychain ---"
-          security find-identity -v -p codesigning build.keychain || true
           echo ""
-          echo "--- Verificando se o certificado está acessível ---"
-          security find-identity -v -p codesigning | grep -i "distribution" || echo "⚠️ Nenhum certificado Distribution encontrado no sistema"
+          echo "--- Certificados no build.keychain ---"
+          CERT_COUNT=$(security find-identity -v -p codesigning build.keychain 2>/dev/null | grep -c "valid identities" || echo "0")
+          if [ "$CERT_COUNT" -eq "0" ]; then
+            echo "❌ NENHUM certificado encontrado no build.keychain!"
+            echo "Listando todos os keychains disponíveis:"
+            security list-keychains
+            echo ""
+            echo "Tentando encontrar certificados em outros keychains:"
+            security find-identity -v -p codesigning
+          else
+            security find-identity -v -p codesigning build.keychain
+          fi
+          echo ""
           echo "✅ Verificação concluída"
 
       - name: Install provisioning profile
