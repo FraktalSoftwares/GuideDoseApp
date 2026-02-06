@@ -164,6 +164,32 @@ jobs:
           echo "📱 Verificando provisioning profiles instalados..."
           ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ || echo "Diretório não existe ainda"
 
+      - name: Configure Xcode project for manual signing
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROVISIONING_PROFILE_SPECIFIER: ${{ secrets.PROVISIONING_PROFILE_SPECIFIER }}
+        run: |
+          echo "🔧 Configurando assinatura manual no projeto Xcode..."
+          
+          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
+          
+          # 1. Substituir "iPhone Developer" por "Apple Distribution" (identidade de code signing)
+          sed -i.bak 's/"iPhone Developer"/"Apple Distribution"/g' "$PBXPROJ"
+          echo "✅ CODE_SIGN_IDENTITY atualizado para Apple Distribution"
+          
+          # 2. Adicionar CODE_SIGN_STYLE = Manual, DEVELOPMENT_TEAM e PROVISIONING_PROFILE_SPECIFIER
+          #    antes de cada PRODUCT_BUNDLE_IDENTIFIER no target Runner
+          sed -i.bak2 "s/PRODUCT_BUNDLE_IDENTIFIER = com.mycompany.mcguidedose.apps;/CODE_SIGN_STYLE = Manual;\n\t\t\t\tDEVELOPMENT_TEAM = $APPLE_TEAM_ID;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"$PROVISIONING_PROFILE_SPECIFIER\";\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.mycompany.mcguidedose.apps;/g" "$PBXPROJ"
+          echo "✅ CODE_SIGN_STYLE, DEVELOPMENT_TEAM e PROVISIONING_PROFILE_SPECIFIER adicionados"
+          
+          # Limpar backups
+          rm -f "$PBXPROJ.bak" "$PBXPROJ.bak2"
+          
+          # Verificar as alterações
+          echo "🔍 Verificando configurações de assinatura no project.pbxproj..."
+          grep -n "CODE_SIGN_IDENTITY\|CODE_SIGN_STYLE\|DEVELOPMENT_TEAM\|PROVISIONING_PROFILE_SPECIFIER\|PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" || true
+          echo "✅ Projeto configurado para assinatura manual"
+
       - name: Build IPA
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
@@ -179,20 +205,8 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
           
           # Listar certificados disponíveis antes do build
-          echo "--- Certificados disponíveis antes do build ---"
-          security find-identity -v -p codesigning build.keychain
-          
-          # Verificar certificados em todos os keychains
-          echo "--- Todos os certificados disponíveis ---"
+          echo "--- Certificados disponíveis ---"
           security find-identity -v -p codesigning
-          
-          # Configurar variáveis de ambiente para o Flutter/Xcode encontrar o certificado
-          export CODESIGN_KEYCHAIN=build.keychain
-          export KEYCHAIN_PATH=$(security list-keychains -d user | grep build.keychain | head -1 | tr -d '"' | tr -d ' ')
-          
-          # Verificar se o ExportOptions.plist existe e está correto
-          echo "📄 Verificando ExportOptions.plist..."
-          cat ios/ExportOptions.plist
           
           # Fazer o build do IPA
           flutter build ipa --release \
