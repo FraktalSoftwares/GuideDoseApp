@@ -147,6 +147,7 @@ jobs:
             echo "✅ Team ID substituído: $APPLE_TEAM_ID"
           else
             echo "⚠️ APPLE_TEAM_ID não configurado"
+            exit 1
           fi
           if [ -n "$PROVISIONING_PROFILE_SPECIFIER" ]; then
             sed -i.bak "s/\$(PROVISIONING_PROFILE_SPECIFIER)/$PROVISIONING_PROFILE_SPECIFIER/g" ios/ExportOptions.plist
@@ -154,9 +155,14 @@ jobs:
             echo "✅ Provisioning Profile Specifier substituído: $PROVISIONING_PROFILE_SPECIFIER"
           else
             echo "⚠️ PROVISIONING_PROFILE_SPECIFIER não configurado"
+            exit 1
           fi
           echo "📄 Conteúdo do ExportOptions.plist:"
           cat ios/ExportOptions.plist
+          
+          # Verificar se o provisioning profile foi instalado corretamente
+          echo "📱 Verificando provisioning profiles instalados..."
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ || echo "Diretório não existe ainda"
 
       - name: Build IPA
         env:
@@ -166,13 +172,29 @@ jobs:
           echo "Versão: ${{ steps.version.outputs.version }}"
           echo "Build: ${{ steps.version.outputs.build }}"
           
-          # Garantir que o keychain está desbloqueado
+          # Garantir que o keychain está configurado como padrão e desbloqueado
+          security list-keychains -d user -s build.keychain
+          security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
           
           # Listar certificados disponíveis antes do build
           echo "--- Certificados disponíveis antes do build ---"
           security find-identity -v -p codesigning build.keychain
           
+          # Verificar certificados em todos os keychains
+          echo "--- Todos os certificados disponíveis ---"
+          security find-identity -v -p codesigning
+          
+          # Configurar variáveis de ambiente para o Flutter/Xcode encontrar o certificado
+          export CODESIGN_KEYCHAIN=build.keychain
+          export KEYCHAIN_PATH=$(security list-keychains -d user | grep build.keychain | head -1 | tr -d '"' | tr -d ' ')
+          
+          # Verificar se o ExportOptions.plist existe e está correto
+          echo "📄 Verificando ExportOptions.plist..."
+          cat ios/ExportOptions.plist
+          
+          # Fazer o build do IPA
           flutter build ipa --release \
             --build-name="${{ steps.version.outputs.version }}" \
             --build-number="${{ steps.version.outputs.build }}" \
