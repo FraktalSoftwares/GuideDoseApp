@@ -18,7 +18,7 @@
 	<string>Apple Distribution</string>
 	<key>provisioningProfiles</key>
 	<dict>
-		<key>com.companyname.medcalc</key>
+		<key>com.mycompany.mcguidedose.apps</key>
 		<string>$(PROVISIONING_PROFILE_SPECIFIER)</string>
 	</dict>
 </dict>
